@@ -152,7 +152,13 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
 
     viewer.entities.removeAll();
 
+    // Defensive dedupe: if any source ever produces colliding IDs, the
+    // first wins. Without this, Cesium throws DeveloperError on the
+    // duplicate add and tears down the globe.
+    const seen = new Set<string>();
     for (const evt of events) {
+      if (seen.has(evt.id)) continue;
+      seen.add(evt.id);
       const isSel = evt.id === selectedId;
       const color = Cesium.Color.fromCssColorString(SEVERITY_HEX[evt.severity] ?? '#ffffff');
       viewer.entities.add({

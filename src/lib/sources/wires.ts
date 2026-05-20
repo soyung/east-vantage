@@ -105,6 +105,15 @@ function extractTag(body: string, tag: string): string | null {
     .trim();
 }
 
+// djb2 hash, base36-encoded. Stable across runs (no Date.now), short,
+// no collisions for URLs sharing a domain prefix (which the previous
+// base64-of-prefix scheme suffered from).
+function hashStr(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 async function fetchFeed(feed: FeedSpec): Promise<IntelEvent[]> {
   const res = await fetch(feed.url, {
     headers: { 'User-Agent': UA, Accept: 'application/rss+xml,application/xml,text/xml,*/*' },
@@ -133,7 +142,7 @@ async function fetchFeed(feed: FeedSpec): Promise<IntelEvent[]> {
     }
 
     out.push({
-      id: `wire-${feed.name.toLowerCase().replace(/\s+/g, '-')}-${Buffer.from(it.link).toString('base64url').slice(0, 16)}`,
+      id: `wire-${feed.name.toLowerCase().replace(/\s+/g, '-')}-${hashStr(it.link)}`,
       title: it.title.slice(0, 180),
       summary: `${feed.name} · ${feed.lang.toUpperCase()}`,
       category,
