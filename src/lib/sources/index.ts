@@ -4,6 +4,7 @@ import { getFirmsEvents } from './firms';
 import { getAdsbEvents } from './adsb';
 import { getUsgsEvents } from './usgs';
 import { getPolymarketMarkets } from './polymarket';
+import { getMndEvents } from './mnd';
 
 export interface MergedResult {
   events: IntelEvent[];
@@ -40,21 +41,28 @@ async function timed<T>(
 }
 
 export async function getAllSources(): Promise<MergedResult> {
-  const [gdelt, firms, adsb, usgs, poly] = await Promise.all([
+  const [gdelt, firms, adsb, usgs, mnd, poly] = await Promise.all([
     timed('GDELT', getGdeltEvents, [] as IntelEvent[]),
     timed('FIRMS', getFirmsEvents, [] as IntelEvent[]),
     timed('ADSB', getAdsbEvents, [] as IntelEvent[]),
     timed('USGS', getUsgsEvents, [] as IntelEvent[]),
+    timed('MND', getMndEvents, [] as IntelEvent[]),
     timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
   ]);
 
-  const allEvents = [...gdelt.value, ...firms.value, ...adsb.value, ...usgs.value];
+  const allEvents = [
+    ...gdelt.value,
+    ...firms.value,
+    ...adsb.value,
+    ...usgs.value,
+    ...mnd.value,
+  ];
   allEvents.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
 
   return {
     events: allEvents,
     markets: poly.value,
-    sources: [gdelt.status, firms.status, adsb.status, usgs.status, poly.status],
+    sources: [gdelt.status, firms.status, adsb.status, usgs.status, mnd.status, poly.status],
     fetchedAt: new Date().toISOString(),
   };
 }
