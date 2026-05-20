@@ -3,38 +3,18 @@ import { geocode, jitter } from './geocode';
 
 const GDELT_DOC = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
-async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
-  let lastErr: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
-    } catch (err) {
-      lastErr = err;
-      // Backoff: 1s, 3s
-      await new Promise((r) => setTimeout(r, 1000 * (i + 1) * (i + 1)));
-    }
-  }
-  throw lastErr;
+// Vercel hobby plan has 10s default function timeout (60s if maxDuration is
+// raised). We must stay well inside that — one short retry only.
+async function fetchOnce(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
-// East Asia query: keep specific to avoid sports/celebrity false-positives.
-// Wrap multi-word phrases in quotes per GDELT DOC syntax.
-const QUERY = [
-  '"taiwan strait"',
-  '"taiwan adiz"',
-  '"median line"',
-  '"pla aircraft"',
-  '"chinese aircraft" taiwan',
-  '"chinese coast guard"',
-  '"senkaku"',
-  '"north korea" (missile OR launch OR icbm OR srbm OR test OR provocation)',
-  '"kim jong un"',
-  '"yongbyon"',
-  '"korean peninsula"',
-  '"dprk"',
-  '"plan carrier"',
-  '"plan navy"',
-].join(' OR ');
+// GDELT DOC query max length is ~250 chars. Split into two narrower queries
+// (Taiwan and Korea) and merge — keeps each below the limit and stays specific.
+const QUERIES = [
+  '("taiwan strait" OR "taiwan adiz" OR "pla aircraft" OR "median line" OR senkaku) (military OR missile OR aircraft OR navy OR incursion)',
+  '("north korea" OR pyongyang OR yongbyon OR dprk OR "korean peninsula") (missile OR launch OR icbm OR test OR sanction OR exercise)',
+];
 
 interface GdeltArticle {
   url: string;
@@ -91,37 +71,66 @@ function dedupeKey(a: GdeltArticle): string {
   }
 }
 
-export async function fetchGdeltEvents(opts?: { timespan?: string; max?: number }): Promise<IntelEvent[]> {
-  const timespan = opts?.timespan ?? '24h';
-  const max = opts?.max ?? 75;
-
+async function fetchOneQuery(
+  query: string,
+  timespan: string,
+  max: number,
+  timeoutMs: number,
+): Promise<GdeltArticle[]> {
   const url = new URL(GDELT_DOC);
-  url.searchParams.set('query', QUERY);
+  url.searchParams.set('query', query);
   url.searchParams.set('mode', 'ArtList');
   url.searchParams.set('format', 'JSON');
   url.searchParams.set('maxrecords', String(max));
   url.searchParams.set('timespan', timespan);
   url.searchParams.set('sort', 'datedesc');
 
-  const res = await fetchWithRetry(url.toString(), {
-    headers: { 'User-Agent': 'east-vantage/0.1 (research)' },
-  });
-  if (!res.ok) throw new Error(`GDELT ${res.status}: ${await res.text().catch(() => '')}`);
-
-  // GDELT sometimes returns invalid JSON when query is malformed; guard.
+  const res = await fetchOnce(
+    url.toString(),
+    { headers: { 'User-Agent': 'east-vantage/0.1 (research)' } },
+    timeoutMs,
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GDELT ${res.status}: ${body.slice(0, 200)}`);
+  }
   const text = await res.text();
-  let data: GdeltDocResponse;
   try {
-    data = JSON.parse(text);
+    const data = JSON.parse(text) as GdeltDocResponse;
+    return data.articles ?? [];
   } catch {
     throw new Error(`GDELT returned non-JSON: ${text.slice(0, 200)}`);
   }
-  const articles = data.articles ?? [];
+}
+
+export async function fetchGdeltEvents(opts?: { timespan?: string; max?: number }): Promise<IntelEvent[]> {
+  const timespan = opts?.timespan ?? '24h';
+  const max = opts?.max ?? 50;
+
+  // Run the two queries with a small delay between them to respect GDELT's
+  // "one request per 5 seconds" guidance. Even if the second fails, return
+  // the first one's results.
+  const errors: string[] = [];
+  const allArticles: GdeltArticle[] = [];
+
+  for (let i = 0; i < QUERIES.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 5500));
+    try {
+      const articles = await fetchOneQuery(QUERIES[i], timespan, max, 7000);
+      allArticles.push(...articles);
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (allArticles.length === 0) {
+    throw new Error(`GDELT returned no articles. ${errors.join(' | ')}`);
+  }
 
   const seen = new Set<string>();
   const events: IntelEvent[] = [];
 
-  for (const a of articles) {
+  for (const a of allArticles) {
     const key = dedupeKey(a);
     if (seen.has(key)) continue;
     seen.add(key);

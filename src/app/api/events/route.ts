@@ -5,6 +5,9 @@ import { SAMPLE_EVENTS } from '@/lib/sample-events';
 // Always run on request (don't statically prerender at build time).
 // The CDN-side Cache-Control headers below give us a 5-min edge cache.
 export const dynamic = 'force-dynamic';
+// Raise Vercel function timeout above default 10s so two sequential GDELT
+// calls (with a 5.5s inter-request gap) can finish comfortably.
+export const maxDuration = 30;
 
 export async function GET() {
   try {
