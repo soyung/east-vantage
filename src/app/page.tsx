@@ -7,6 +7,7 @@ import EventFeed from '@/components/EventFeed';
 import FilterChips from '@/components/FilterChips';
 import MarketPanel from '@/components/MarketPanel';
 import SeverityLegend from '@/components/SeverityLegend';
+import SplitHandle from '@/components/SplitHandle';
 import { SAMPLE_EVENTS } from '@/lib/sample-events';
 import type {
   EventCategory,
@@ -50,6 +51,8 @@ export default function Home() {
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set(ALL_CATEGORIES),
   );
+  // Mobile-only: globe height as % of viewport. Drag the handle to resize.
+  const [mobileMainPct, setMobileMainPct] = useState(45);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,10 +111,11 @@ export default function Home() {
         fetchedAt={fetchedAt}
         sources={sources}
       />
-      {/* Mobile: globe pinned at top 45dvh, sidebar fills rest (scrolls).
+      {/* Mobile: globe at top (resizable via SplitHandle), sidebar fills rest.
           Desktop (md+): sidebar 380px left, globe fills rest. */}
       <div className="flex flex-1 flex-col-reverse overflow-hidden md:flex-row">
         <aside className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#070a10] md:w-[380px] md:flex-none md:overflow-hidden md:border-r md:border-zinc-800">
+          <SplitHandle mainPct={mobileMainPct} setMainPct={setMobileMainPct} />
           <FilterChips
             activeRegion={activeRegion}
             activeCategories={activeCategories}
@@ -122,7 +126,10 @@ export default function Home() {
           <SeverityLegend />
           <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
-        <main className="relative h-[45dvh] flex-shrink-0 md:h-auto md:flex-1">
+        <main
+          className="relative flex-shrink-0 md:h-auto md:flex-1"
+          style={{ height: `${mobileMainPct}dvh` }}
+        >
           <Globe events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </main>
       </div>
