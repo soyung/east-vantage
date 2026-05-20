@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { IntelEvent } from '@/lib/types';
 import { ZONES } from '@/lib/zones';
 
@@ -70,6 +70,7 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
   const CesiumRef = useRef<CesiumNS | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +147,7 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
         viewerRef.current = viewer;
+        setReady(true);
       })
       .catch((err) => {
         console.error('[CesiumGlobe] init failed:', err);
@@ -183,7 +185,6 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
           color,
           outlineColor: Cesium.Color.WHITE,
           outlineWidth: isSel ? 3 : 1.5,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         },
         label: isSel
           ? {
@@ -202,7 +203,7 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
           : undefined,
       });
     }
-  }, [events, selectedId]);
+  }, [events, selectedId, ready]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
