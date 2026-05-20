@@ -1,7 +1,18 @@
+import { Agent, fetch as undiciFetch } from 'undici';
 import type { EventCategory, EventSeverity, IntelEvent } from '../types';
 import { geocode, jitter } from '../geocode';
 
 const GDELT_DOC = 'https://api.gdeltproject.org/api/v2/doc/doc';
+
+// Node's built-in fetch (undici) defaults to a 10s TCP connect timeout, and
+// the path from Vercel SFO to api.gdeltproject.org regularly exceeds that.
+// Dedicated dispatcher with longer connect window solves it without
+// affecting other fetches.
+const gdeltDispatcher = new Agent({
+  connect: { timeout: 25_000 },
+  bodyTimeout: 25_000,
+  headersTimeout: 25_000,
+});
 
 // Tighter query — every clause includes at least one kinetic anchor so we
 // don't pull generic op-eds. ~210 chars (under GDELT's 250 limit).
@@ -14,7 +25,7 @@ const QUERY =
 const TITLE_KEYWORD_RX =
   /(missile|launch|aircraft|sortie|scramble|incursion|drill|exercise|breach|crossed|fire|test|naval|vessel|warship|carrier|adiz|median line|warning)/i;
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 25_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface GdeltArticle {
@@ -112,9 +123,10 @@ async function fetchArticles(): Promise<GdeltArticle[]> {
   url.searchParams.set('timespan', '24h');
   url.searchParams.set('sort', 'datedesc');
 
-  const res = await fetch(url.toString(), {
+  const res = await undiciFetch(url.toString(), {
     headers: { 'User-Agent': 'east-vantage/0.2 (research)' },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    dispatcher: gdeltDispatcher,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

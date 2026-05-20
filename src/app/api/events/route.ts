@@ -3,7 +3,16 @@ import { getAllSources } from '@/lib/sources';
 import { SAMPLE_EVENTS } from '@/lib/sample-events';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 25;
+// Hobby plan max is 60s. We need >25s to absorb the GDELT connect window.
+export const maxDuration = 35;
+// Run this function from Vercel's US East region — much closer to
+// api.gdeltproject.org (Georgetown / US East) than the default SFO.
+export const preferredRegion = 'iad1';
+
+const JSON_HEADERS = (extra: Record<string, string> = {}) => ({
+  'Content-Type': 'application/json; charset=utf-8',
+  ...extra,
+});
 
 export async function GET() {
   try {
@@ -18,15 +27,19 @@ export async function GET() {
           source: 'sample',
           fetchedAt,
         },
-        { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+        {
+          headers: JSON_HEADERS({
+            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          }),
+        },
       );
     }
     return NextResponse.json(
       { events, markets, sources, source: 'live', fetchedAt },
       {
-        headers: {
+        headers: JSON_HEADERS({
           'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
-        },
+        }),
       },
     );
   } catch (err) {
@@ -40,7 +53,9 @@ export async function GET() {
         error: err instanceof Error ? err.message : String(err),
         fetchedAt: new Date().toISOString(),
       },
-      { headers: { 'Cache-Control': 'public, s-maxage=30' } },
+      {
+        headers: JSON_HEADERS({ 'Cache-Control': 'public, s-maxage=30' }),
+      },
     );
   }
 }

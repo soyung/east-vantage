@@ -90,8 +90,8 @@ async function fetchEarthquakes(): Promise<IntelEvent[]> {
     return {
       id: `usgs-${f.id}`,
       title: nearTestSite
-        ? `M${f.properties.mag.toFixed(1)} near Punggye-ri — possible nuclear test`
-        : `M${f.properties.mag.toFixed(1)} earthquake · ${f.properties.place}`,
+        ? `M${f.properties.mag.toFixed(1)} near Punggye-ri - possible nuclear test`
+        : `M${f.properties.mag.toFixed(1)} earthquake - ${f.properties.place}`,
       summary: f.properties.place,
       category: 'seismic' as const,
       severity: severityFromMag(f.properties.mag, nearTestSite),
