@@ -14,7 +14,10 @@ const LANG_FLAG: Record<string, { label: string; tone: string }> = {
   en: { label: 'EN', tone: 'bg-zinc-700 text-zinc-300' },
   ko: { label: 'KR', tone: 'bg-blue-900/60 text-blue-200' },
   ja: { label: 'JP', tone: 'bg-rose-900/60 text-rose-200' },
-  zh: { label: 'ZH', tone: 'bg-amber-900/60 text-amber-200' },
+  // Use CN (country code, matches KR/JP convention). ZH is technically
+  // the ISO language code but reads as ambiguous in this UI; CH is
+  // Switzerland so avoid that.
+  zh: { label: 'CN', tone: 'bg-amber-900/60 text-amber-200' },
 };
 
 // Tags that are meta-signals about provenance / classifier confidence.

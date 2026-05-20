@@ -1,14 +1,15 @@
 import type { EventCategory, EventSeverity, IntelEvent } from '../types';
 import { geocode, jitter } from '../geocode';
 
-// Reddit public JSON endpoints. No auth required for read-only listing
-// but a distinct User-Agent is mandatory — generic UAs get 429'd.
-//
-// Strategy: hit /new.json on a curated set of subreddits, post-filter
-// posts by title keyword + minimum engagement (score + comment count)
-// so trolls and low-effort posts don't flood the feed.
+// Reddit source. We use the .rss endpoint instead of .json because:
+//   - Reddit aggressively rate-limits/blocks data-center IPs on JSON
+//     (Vercel iad1 functions tend to hit those limits)
+//   - .rss is the older Atom interface and remains generally accessible
+//     without OAuth or specialty UA
+//   - It carries everything we need: title, link, score (in description),
+//     timestamp.
 
-const UA = 'east-vantage/0.3 (by /u/eastvantage research aggregator)';
+const UA = 'east-vantage/0.3 (research aggregator, contact via repo)';
 const REQUEST_TIMEOUT_MS = 10_000;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -26,7 +27,6 @@ const REGION_RX =
 const KINETIC_RX =
   /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|hack|sanction|invasion|deploy|test|nuclear|reactor|provocation|airspace|naval)/i;
 
-// Reuse the same classification heuristics as the GDELT source.
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
   [/missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic/i, 'missile'],
   [/aircraft|fighter|adiz|j-?\d+|jet|airspace|sortie|incursion|scramble/i, 'air'],
@@ -40,70 +40,104 @@ function classifyCategory(text: string): EventCategory | null {
   return null;
 }
 
-function classifySeverity(text: string, score: number): EventSeverity {
+function classifySeverity(text: string): EventSeverity {
   if (/\b(nuclear test|war|invasion|icbm|killed)\b/i.test(text)) return 'critical';
   if (/\b(launch|missile|incursion|breach|crossed)\b/i.test(text)) return 'high';
   if (/\b(exercise|drill|sortie|deploy|scramble)\b/i.test(text)) return 'medium';
-  if (score > 100) return 'medium';
   return 'low';
 }
 
-interface RedditPost {
-  id: string;
+function hashStr(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+interface RssEntry {
   title: string;
-  subreddit: string;
-  permalink: string;
-  url: string;
-  score: number;
-  num_comments: number;
-  created_utc: number;
-  selftext?: string;
+  link: string;
+  published: string;
 }
 
-interface RedditListing {
-  data: { children: Array<{ data: RedditPost }> };
+function parseAtom(xml: string): RssEntry[] {
+  const out: RssEntry[] = [];
+  // Atom <entry> blocks
+  const entryRx = /<entry>([\s\S]*?)<\/entry>/g;
+  let m: RegExpExecArray | null;
+  while ((m = entryRx.exec(xml)) !== null) {
+    const body = m[1];
+    const title = (/<title[^>]*>([\s\S]*?)<\/title>/.exec(body)?.[1] ?? '')
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, '$1')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const linkM = /<link[^>]*href="([^"]+)"/.exec(body);
+    const link = linkM ? linkM[1] : '';
+    const published = /<published>([^<]+)<\/published>/.exec(body)?.[1] ?? '';
+    if (title && link) out.push({ title, link, published });
+  }
+  return out;
 }
 
-async function fetchSubreddit(sub: string): Promise<IntelEvent[]> {
-  const url = `https://www.reddit.com/r/${sub}/new.json?limit=25`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (!res.ok) throw new Error(`Reddit ${sub} ${res.status}`);
-  const data = (await res.json()) as RedditListing;
-  const posts = (data.data?.children ?? []).map((c) => c.data);
+interface FetchResult {
+  sub: string;
+  ok: boolean;
+  status: number;
+  events: IntelEvent[];
+}
+
+async function fetchSubreddit(sub: string): Promise<FetchResult> {
+  const url = `https://www.reddit.com/r/${sub}/new/.rss?limit=25`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'application/atom+xml,application/xml,text/xml,*/*' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.warn(`[reddit] ${sub} network error:`, err);
+    return { sub, ok: false, status: 0, events: [] };
+  }
+  if (!res.ok) {
+    return { sub, ok: false, status: res.status, events: [] };
+  }
+  const xml = await res.text();
+  const entries = parseAtom(xml);
 
   const events: IntelEvent[] = [];
-  for (const p of posts) {
-    const title = p.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
-    if (!REGION_RX.test(title)) continue;
-    if (!KINETIC_RX.test(title)) continue;
-    const category = classifyCategory(title);
+  for (const e of entries) {
+    if (!REGION_RX.test(e.title)) continue;
+    if (!KINETIC_RX.test(e.title)) continue;
+    const category = classifyCategory(e.title);
     if (!category) continue;
-    // Engagement floor: must have at least some upvotes OR comments
-    if (p.score < 5 && p.num_comments < 3) continue;
-
-    const hit = geocode(title);
+    const hit = geocode(e.title);
     if (!hit) continue;
-    const { lat, lon } = jitter(hit.lat, hit.lon, p.id);
+    const { lat, lon } = jitter(hit.lat, hit.lon, e.link);
+
+    let timestamp = new Date().toISOString();
+    if (e.published) {
+      const d = new Date(e.published);
+      if (!isNaN(d.getTime())) timestamp = d.toISOString();
+    }
 
     events.push({
-      id: `reddit-${p.id}`,
-      title: title.slice(0, 180),
-      summary: `r/${p.subreddit} · score ${p.score} · ${p.num_comments} comments`,
+      id: `reddit-${hashStr(e.link)}`,
+      title: e.title.slice(0, 180),
+      summary: `r/${sub}`,
       category,
-      severity: classifySeverity(title, p.score),
+      severity: classifySeverity(e.title),
       region: hit.region,
       lat,
       lon,
-      timestamp: new Date(p.created_utc * 1000).toISOString(),
-      source: `Reddit/r/${p.subreddit}`,
-      sourceUrl: `https://www.reddit.com${p.permalink}`,
-      tags: [`score:${p.score}`, `comments:${p.num_comments}`],
+      timestamp,
+      source: `Reddit/r/${sub}`,
+      sourceUrl: e.link,
     });
   }
-  return events;
+  return { sub, ok: true, status: 200, events };
 }
 
 interface CacheEntry {
@@ -119,16 +153,18 @@ export async function getRedditEvents(): Promise<IntelEvent[]> {
 
   if (!inflight) {
     inflight = (async () => {
-      // Sequential with small delay to be polite to Reddit (per-IP limits)
       const all: IntelEvent[] = [];
+      const failures: string[] = [];
       for (let i = 0; i < SUBREDDITS.length; i++) {
         if (i > 0) await new Promise((r) => setTimeout(r, 800));
-        try {
-          const events = await fetchSubreddit(SUBREDDITS[i]);
-          all.push(...events);
-        } catch (err) {
-          console.warn(`[reddit] ${SUBREDDITS[i]} failed:`, err);
-        }
+        const r = await fetchSubreddit(SUBREDDITS[i]);
+        if (!r.ok) failures.push(`${r.sub}:${r.status}`);
+        all.push(...r.events);
+      }
+      // If every subreddit returned a non-OK response we've been blocked
+      // — throw so the source status reports ok:false instead of silently 0.
+      if (failures.length === SUBREDDITS.length) {
+        throw new Error(`reddit all-blocked: ${failures.join(', ')}`);
       }
       return all;
     })().finally(() => {
