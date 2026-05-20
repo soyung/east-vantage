@@ -1,8 +1,19 @@
 # East Vantage
 
 East Asia–focused OSINT intelligence dashboard. A research-grade demo modeled
-on [DeltaSweep](https://www.deltasweep.com/), narrowed to the Taiwan Strait
-and Korean peninsula.
+on [DeltaSweep](https://www.deltasweep.com/), covering the Taiwan Strait,
+Korean peninsula, Japan, and Chinese mainland.
+
+> **Open-source intelligence only.** Every data point displayed here comes
+> from publicly available feeds: government press releases (Taiwan MND,
+> USGS, NASA FIRMS), commercial open APIs (adsb.lol, Polymarket), news
+> wires (Yonhap, NHK, etc.), public Reddit / Telegram channels, and
+> Wikipedia for installation coordinates. We don't host classified
+> material, don't aggregate non-public ADS-B transponder data, and
+> don't republish satellite imagery — only point markers from FIRMS
+> heat-detection events. This places us alongside Bellingcat, 38 North,
+> CSIS China Power Project, PLATracker, and Taiwan Security Monitor in
+> the standard public-OSINT category.
 
 > **Status:** 8 live sources + LLM classifier. See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)
 > for the as-built source catalog and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.

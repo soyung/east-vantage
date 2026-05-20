@@ -6,6 +6,36 @@ section on what was deliberately skipped and why.
 
 For a deeper plan of what's coming next, see [ROADMAP.md](ROADMAP.md).
 
+## Open-source intelligence — provenance and scope
+
+Every data point displayed in East Vantage comes from publicly available
+feeds:
+
+- **Government press releases** that are already published online by the
+  agency that produced them (Taiwan MND daily PLA activity reports, USGS
+  earthquake catalog, NASA FIRMS fire detections, Polymarket public
+  contracts).
+- **Commercial open APIs** designed for public use (adsb.lol for ADS-B
+  broadcasts that aircraft *voluntarily* transmit, GDELT 2.0 for news
+  events).
+- **News wire RSS** (Yonhap, NHK, Japan Times, 38 North, SCMP, CNA) —
+  feeds the outlets publish for syndication.
+- **Public discussion** on Reddit and Telegram channels, none of them
+  private or invitation-only.
+- **Wikipedia / OpenStreetMap** for military installation coordinates —
+  these are matters of public record published by the operating
+  governments themselves.
+
+**What we do not include:** classified or leaked material, non-public
+ADS-B data, full satellite imagery (we only carry FIRMS point markers,
+not pixels), real-time positions of aircraft whose operators have
+disabled their transponders, or any feed obtained without permission.
+
+This is the same posture as Bellingcat, 38 North, CSIS China Power
+Project, Taiwan Security Monitor, and PLATracker — standard public-OSINT
+practice that has been operated in many jurisdictions for years without
+legal issue.
+
 ## Live sources
 
 All sources are aggregated through [`src/lib/sources/index.ts`](../src/lib/sources/index.ts)
