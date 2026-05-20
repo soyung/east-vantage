@@ -3,18 +3,14 @@ import { geocode, jitter } from './geocode';
 
 const GDELT_DOC = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
-// Vercel hobby plan has 10s default function timeout (60s if maxDuration is
-// raised). We must stay well inside that — one short retry only.
-async function fetchOnce(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-}
+// Single combined query covering Taiwan + Korea, kept under GDELT's ~250-char
+// query length limit. One query means one HTTP request — avoids the
+// "1 req per 5s" rate limit and keeps us inside Vercel's function timeout.
+const QUERY =
+  '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR "korean peninsula" OR senkaku) (military OR missile OR launch OR aircraft OR navy OR sanction)';
 
-// GDELT DOC query max length is ~250 chars. Split into two narrower queries
-// (Taiwan and Korea) and merge — keeps each below the limit and stays specific.
-const QUERIES = [
-  '("taiwan strait" OR "taiwan adiz" OR "pla aircraft" OR "median line" OR senkaku) (military OR missile OR aircraft OR navy OR incursion)',
-  '("north korea" OR pyongyang OR yongbyon OR dprk OR "korean peninsula") (missile OR launch OR icbm OR test OR sanction OR exercise)',
-];
+const REQUEST_TIMEOUT_MS = 15_000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface GdeltArticle {
   url: string;
@@ -46,7 +42,6 @@ function classifyCategory(text: string): EventCategory {
   return 'diplomatic';
 }
 
-// Heuristic severity: certain keywords bump it up.
 function classifySeverity(text: string): EventSeverity {
   if (/\b(icbm|nuclear test|war|invasion|attack|killed)\b/i.test(text)) return 'critical';
   if (/\b(launch|missile|incursion|scramble|breach|sanction)\b/i.test(text)) return 'high';
@@ -56,13 +51,11 @@ function classifySeverity(text: string): EventSeverity {
 }
 
 function parseGdeltDate(s: string): string {
-  // "20260520T071500Z" → "2026-05-20T07:15:00Z"
   if (!/^\d{8}T\d{6}Z$/.test(s)) return new Date().toISOString();
   return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`;
 }
 
 function dedupeKey(a: GdeltArticle): string {
-  // Strip query string from URL to merge variants of the same article
   try {
     const u = new URL(a.url);
     return `${u.hostname}${u.pathname}`;
@@ -71,75 +64,16 @@ function dedupeKey(a: GdeltArticle): string {
   }
 }
 
-async function fetchOneQuery(
-  query: string,
-  timespan: string,
-  max: number,
-  timeoutMs: number,
-): Promise<GdeltArticle[]> {
-  const url = new URL(GDELT_DOC);
-  url.searchParams.set('query', query);
-  url.searchParams.set('mode', 'ArtList');
-  url.searchParams.set('format', 'JSON');
-  url.searchParams.set('maxrecords', String(max));
-  url.searchParams.set('timespan', timespan);
-  url.searchParams.set('sort', 'datedesc');
-
-  const res = await fetchOnce(
-    url.toString(),
-    { headers: { 'User-Agent': 'east-vantage/0.1 (research)' } },
-    timeoutMs,
-  );
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`GDELT ${res.status}: ${body.slice(0, 200)}`);
-  }
-  const text = await res.text();
-  try {
-    const data = JSON.parse(text) as GdeltDocResponse;
-    return data.articles ?? [];
-  } catch {
-    throw new Error(`GDELT returned non-JSON: ${text.slice(0, 200)}`);
-  }
-}
-
-export async function fetchGdeltEvents(opts?: { timespan?: string; max?: number }): Promise<IntelEvent[]> {
-  const timespan = opts?.timespan ?? '24h';
-  const max = opts?.max ?? 50;
-
-  // Run the two queries with a small delay between them to respect GDELT's
-  // "one request per 5 seconds" guidance. Even if the second fails, return
-  // the first one's results.
-  const errors: string[] = [];
-  const allArticles: GdeltArticle[] = [];
-
-  for (let i = 0; i < QUERIES.length; i++) {
-    if (i > 0) await new Promise((r) => setTimeout(r, 5500));
-    try {
-      const articles = await fetchOneQuery(QUERIES[i], timespan, max, 7000);
-      allArticles.push(...articles);
-    } catch (err) {
-      errors.push(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  if (allArticles.length === 0) {
-    throw new Error(`GDELT returned no articles. ${errors.join(' | ')}`);
-  }
-
+function articlesToEvents(articles: GdeltArticle[]): IntelEvent[] {
   const seen = new Set<string>();
   const events: IntelEvent[] = [];
-
-  for (const a of allArticles) {
+  for (const a of articles) {
     const key = dedupeKey(a);
     if (seen.has(key)) continue;
     seen.add(key);
-
     const hit = geocode(a.title, a.sourcecountry);
     if (!hit) continue;
-
     const { lat, lon } = jitter(hit.lat, hit.lon, a.url);
-
     events.push({
       id: `gdelt-${key}`,
       title: a.title.trim(),
@@ -154,6 +88,78 @@ export async function fetchGdeltEvents(opts?: { timespan?: string; max?: number 
       sourceUrl: a.url,
     });
   }
-
   return events;
+}
+
+async function fetchArticles(): Promise<GdeltArticle[]> {
+  const url = new URL(GDELT_DOC);
+  url.searchParams.set('query', QUERY);
+  url.searchParams.set('mode', 'ArtList');
+  url.searchParams.set('format', 'JSON');
+  url.searchParams.set('maxrecords', '75');
+  url.searchParams.set('timespan', '24h');
+  url.searchParams.set('sort', 'datedesc');
+
+  const res = await fetch(url.toString(), {
+    headers: { 'User-Agent': 'east-vantage/0.1 (research)' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GDELT ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as GdeltDocResponse;
+    return data.articles ?? [];
+  } catch {
+    throw new Error(`GDELT returned non-JSON: ${text.slice(0, 200)}`);
+  }
+}
+
+// In-memory cache that survives within a warm serverless container.
+// Concurrent invocations to the same container share it, so we don't hammer
+// GDELT. Different containers will each fetch once.
+interface CacheEntry {
+  events: IntelEvent[];
+  at: number;
+}
+let cache: CacheEntry | null = null;
+let inflight: Promise<IntelEvent[]> | null = null;
+
+export interface FetchResult {
+  events: IntelEvent[];
+  fromCache: 'fresh' | 'stale' | 'none';
+  error?: string;
+}
+
+export async function getEvents(): Promise<FetchResult> {
+  const now = Date.now();
+  if (cache && now - cache.at < CACHE_TTL_MS) {
+    return { events: cache.events, fromCache: 'fresh' };
+  }
+
+  // Coalesce concurrent callers in the same container.
+  if (!inflight) {
+    inflight = fetchArticles()
+      .then((articles) => articlesToEvents(articles))
+      .finally(() => {
+        inflight = null;
+      });
+  }
+
+  try {
+    const events = await inflight;
+    if (events.length > 0) {
+      cache = { events, at: now };
+    }
+    return { events, fromCache: 'none' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (cache) {
+      // Stale-while-error: better to show old GDELT data than sample.
+      return { events: cache.events, fromCache: 'stale', error: message };
+    }
+    throw err;
+  }
 }

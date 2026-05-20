@@ -18,14 +18,15 @@ const ALL_CATEGORIES: EventCategory[] = [
   'economic',
 ];
 
-type DataSource = 'loading' | 'gdelt' | 'sample';
+type DataSource = 'loading' | 'gdelt' | 'gdelt-stale' | 'sample';
 
 interface EventsResponse {
   events: IntelEvent[];
-  source: 'gdelt' | 'sample';
+  source: 'gdelt' | 'gdelt-stale' | 'sample';
   fetchedAt?: string;
   reason?: string;
   error?: string;
+  warning?: string;
 }
 
 export default function Home() {

@@ -3,24 +3,33 @@ import { timeAgo } from '@/lib/format';
 
 interface Props {
   eventCount: number;
-  dataSource: 'loading' | 'gdelt' | 'sample';
+  dataSource: 'loading' | 'gdelt' | 'gdelt-stale' | 'sample';
   fetchedAt: string | null;
 }
 
 export default function Header({ eventCount, dataSource, fetchedAt }: Props) {
+  const isLive = dataSource === 'gdelt';
+  const isStale = dataSource === 'gdelt-stale';
+
   const sourceLabel =
     dataSource === 'loading'
       ? 'loading…'
-      : dataSource === 'gdelt'
+      : isLive
         ? `GDELT 2.0${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ''}`
-        : 'sample data';
+        : isStale
+          ? `GDELT 2.0 · stale${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ''}`
+          : 'sample data';
 
-  const sourceTone =
-    dataSource === 'gdelt'
-      ? 'text-emerald-400'
+  const sourceTone = isLive
+    ? 'text-emerald-400'
+    : isStale
+      ? 'text-amber-300'
       : dataSource === 'sample'
         ? 'text-amber-400'
         : 'text-zinc-500';
+
+  const dotColor = isLive ? 'bg-emerald-500' : isStale ? 'bg-amber-300' : 'bg-amber-500';
+  const ringColor = isLive ? 'bg-emerald-400' : isStale ? 'bg-amber-200' : 'bg-amber-400';
 
   return (
     <header className="flex items-center justify-between border-b border-zinc-800 bg-[#0a0a0a] px-5 py-3">
@@ -41,15 +50,9 @@ export default function Header({ eventCount, dataSource, fetchedAt }: Props) {
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span
-              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
-                dataSource === 'gdelt' ? 'bg-emerald-400' : 'bg-amber-400'
-              }`}
+              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${ringColor}`}
             />
-            <span
-              className={`relative inline-flex h-2 w-2 rounded-full ${
-                dataSource === 'gdelt' ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}
-            />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
           </span>
           <span>
             LIVE · <span className="text-zinc-200">{eventCount}</span> events
