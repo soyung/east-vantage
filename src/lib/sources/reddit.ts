@@ -20,10 +20,12 @@ const SUBREDDITS = [
   'IndoPacificNews',
   'korea',
   'taiwan',
+  'japan_news',
+  'China_irl',
 ];
 
 const REGION_RX =
-  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|tsmc|hsinchu|taipei|kaohsiung|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|busan|jeju|ieodo|senkaku|diaoyu|okinawa|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련)/i;
+  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|tsmc|hsinchu|taipei|kaohsiung|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|busan|jeju|ieodo|japan|japanese|jsdf|yokota|kadena|misawa|iwakuni|sasebo|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|guangzhou|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|自衛隊)/i;
 const KINETIC_RX =
   /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|hack|sanction|invasion|deploy|test|nuclear|reactor|provocation|airspace|naval)/i;
 

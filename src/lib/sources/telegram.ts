@@ -20,7 +20,7 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 const CHANNELS = ['OSINTtechnical', 'GeoPWatch', 'WarMonitor3', 'Faytuks'];
 
 const REGION_RX =
-  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|jeju|ieodo|senkaku|diaoyu|okinawa|台|中|韓|朝|防空|海峡|미사일|북한|대만|중국)/i;
+  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|jeju|ieodo|japan|japanese|jsdf|yokota|kadena|misawa|iwakuni|sasebo|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|自衛隊)/i;
 const KINETIC_RX =
   /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|sanction|test|nuclear|reactor|provocation|airspace|naval|patrol|飛彈|导弹|发射|戰機|战机|미사일|발사|훈련|침범)/i;
 

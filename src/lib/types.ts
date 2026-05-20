@@ -10,7 +10,12 @@ export type EventCategory =
 
 export type EventSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 
-export type EventRegion = 'taiwan-strait' | 'korean-peninsula' | 'other';
+export type EventRegion =
+  | 'taiwan-strait'
+  | 'korean-peninsula'
+  | 'japan'
+  | 'china-mainland'
+  | 'other';
 
 export interface IntelEvent {
   id: string;

@@ -16,8 +16,10 @@ const CATEGORIES: EventCategory[] = [
 
 const REGIONS: { id: EventRegion | 'all'; label: string }[] = [
   { id: 'all', label: 'All regions' },
-  { id: 'taiwan-strait', label: 'Taiwan Strait' },
-  { id: 'korean-peninsula', label: 'Korean Peninsula' },
+  { id: 'taiwan-strait', label: 'Taiwan' },
+  { id: 'korean-peninsula', label: 'Korea' },
+  { id: 'japan', label: 'Japan' },
+  { id: 'china-mainland', label: 'China' },
   { id: 'other', label: 'Other' },
 ];
 

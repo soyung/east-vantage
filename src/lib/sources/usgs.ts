@@ -50,8 +50,10 @@ function severityFromMag(mag: number, nearTestSite: boolean): EventSeverity {
 }
 
 function regionFor(lat: number, lon: number): IntelEvent['region'] {
-  if (lon >= 124 && lon <= 131 && lat >= 33 && lat <= 43) return 'korean-peninsula';
   if (lon >= 117 && lon <= 124 && lat >= 21 && lat <= 29) return 'taiwan-strait';
+  if (lon >= 124 && lon <= 131 && lat >= 33 && lat <= 43) return 'korean-peninsula';
+  if (lon >= 129 && lon <= 146 && lat >= 30 && lat <= 46) return 'japan';
+  if (lon >= 73 && lon <= 135 && lat >= 18 && lat <= 53) return 'china-mainland';
   return 'other';
 }
 
@@ -67,11 +69,12 @@ async function fetchEarthquakes(): Promise<IntelEvent[]> {
   const url = new URL(USGS);
   url.searchParams.set('format', 'geojson');
   url.searchParams.set('starttime', since);
-  url.searchParams.set('minlatitude', '21');
-  url.searchParams.set('maxlatitude', '43');
-  url.searchParams.set('minlongitude', '117');
-  url.searchParams.set('maxlongitude', '132');
-  url.searchParams.set('minmagnitude', '3');
+  // Expanded to cover all East Asia: China + Korea + Japan + Taiwan
+  url.searchParams.set('minlatitude', '18');
+  url.searchParams.set('maxlatitude', '53');
+  url.searchParams.set('minlongitude', '73');
+  url.searchParams.set('maxlongitude', '147');
+  url.searchParams.set('minmagnitude', '3.5');
 
   const res = await fetch(url.toString(), {
     headers: { 'User-Agent': 'east-vantage/0.2 (research)' },

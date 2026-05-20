@@ -10,7 +10,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // Two-stage filter — must mention an East Asia security subject AND a
 // substantive geopolitical topic. Cuts out the "Will Trump say <word>"
 // meme markets that pass a one-word keyword filter.
-const REGION_RX = /(taiwan|china|xi jinping|north korea|kim jong un|pyongyang|korean peninsula|south korea|tsmc|pla|dprk|seoul|jeju|senkaku|ieodo)/i;
+const REGION_RX = /(taiwan|china|xi jinping|north korea|kim jong un|pyongyang|korean peninsula|south korea|tsmc|pla|dprk|seoul|jeju|senkaku|ieodo|japan|japanese|jsdf|hong kong|beijing|shanghai|tibet)/i;
 const TOPIC_RX = /(invade|invasion|attack|war|nuclear|missile|test|launch|sanction|tariff|coup|leader|premier|president|election|fall|collapse|regime|escalation|conflict|incident|airspace|adiz|strait|chip|export control|reunif|annex|crisis|incursion|drill|exercise|ban|deal)/i;
 const EXCLUDE_RX = /(trump (say|tweet|post|mention|name|drop|use|wear)|will (he|she|trump|biden|kamala|musk) (say|mention|tweet|post|wear|drop))/i;
 

@@ -10,11 +10,18 @@ const CACHE_TTL_MS = 60 * 1000;
 
 // Bbox covering Taiwan Strait + Korean peninsula + adjacent waters
 const REGION_BBOXES: Array<{ region: IntelEvent['region']; w: number; s: number; e: number; n: number }> = [
-  { region: 'taiwan-strait', w: 115, s: 18, e: 126, n: 30 },
-  { region: 'korean-peninsula', w: 122, s: 32, e: 134, n: 43 },
+  { region: 'taiwan-strait', w: 117, s: 21, e: 124, n: 29 },
+  { region: 'korean-peninsula', w: 124, s: 33, e: 131, n: 43 },
+  { region: 'japan', w: 129, s: 30, e: 146, n: 46 },
+  // China bbox is large — most PLA flights stay in mainland airspace
+  // and many don't broadcast ADS-B, but we still want to catch those
+  // that do (transports, AEW, surveillance).
+  { region: 'china-mainland', w: 73, s: 18, e: 135, n: 53 },
 ];
 
 function regionFor(lat: number, lon: number): IntelEvent['region'] | null {
+  // Order matters — smaller / more-specific bboxes first so e.g. an
+  // aircraft right above Taiwan gets 'taiwan-strait' not 'china-mainland'.
   for (const b of REGION_BBOXES) {
     if (lon >= b.w && lon <= b.e && lat >= b.s && lat <= b.n) return b.region;
   }

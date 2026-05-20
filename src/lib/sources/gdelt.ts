@@ -14,10 +14,10 @@ const gdeltDispatcher = new Agent({
   headersTimeout: 25_000,
 });
 
-// Tighter query — every clause includes at least one kinetic anchor so we
-// don't pull generic op-eds. ~210 chars (under GDELT's 250 limit).
+// Expanded query — covers all E Asia (Taiwan/Korea/Japan/China) with
+// kinetic anchor. GDELT caps query length at ~250 chars; this is ~240.
 const QUERY =
-  '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR senkaku) (missile OR launch OR sortie OR scramble OR incursion OR drill OR exercise OR "median line" OR breach)';
+  '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR senkaku OR "kadena" OR "jsdf" OR "yokota" OR "jiuquan" OR "xichang" OR plaaf) (missile OR launch OR sortie OR scramble OR incursion OR drill OR "median line" OR breach)';
 
 // Title must contain at least one kinetic keyword. Includes CJK terms so
 // that Chinese/Japanese/Korean wire coverage (which dominates East Asia

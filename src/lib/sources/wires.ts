@@ -26,9 +26,9 @@ const FEEDS: FeedSpec[] = [
   { name: 'SCMP', url: 'https://www.scmp.com/rss/91/feed', lang: 'en' },
 ];
 
-// Region + kinetic gates (CJK-aware)
+// Region + kinetic gates (CJK-aware, full East Asia)
 const REGION_RX =
-  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|jeju|ieodo|senkaku|diaoyu|okinawa|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|発射|戦闘機|領空)/i;
+  /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|hsinchu|north korea|dprk|kim jong|pyongyang|yongbyon|sohae|punggye|korean peninsula|south korea|seoul|jeju|ieodo|japan|japanese|jsdf|jasdf|jmsdf|yokota|kadena|misawa|iwakuni|sasebo|yokosuka|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|guangzhou|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|発射|戦闘機|領空|自衛隊)/i;
 
 const KINETIC_RX =
   /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|sanction|test|nuclear|reactor|provocation|airspace|naval|warning|patrol|飛彈|导弹|发射|戰機|战机|軍機|军机|演習|演习|미사일|발사|훈련|침범|ミサイル|発射|戦闘機|演習)/i;
