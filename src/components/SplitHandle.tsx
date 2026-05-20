@@ -18,10 +18,10 @@ export default function SplitHandle({ mainPct, setMainPct, headerOffset = 56 }: 
       role="separator"
       aria-orientation="horizontal"
       aria-label="Resize map and feed"
-      className="flex h-4 w-full cursor-row-resize touch-none items-center justify-center bg-zinc-900/80 md:hidden"
+      className="flex h-6 w-full cursor-row-resize touch-none select-none items-center justify-center bg-zinc-900/80 md:hidden"
       onPointerDown={(e) => {
         dragging.current = true;
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
         if (!dragging.current) return;
@@ -32,11 +32,21 @@ export default function SplitHandle({ mainPct, setMainPct, headerOffset = 56 }: 
       }}
       onPointerUp={(e) => {
         dragging.current = false;
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+      }}
+      onPointerCancel={(e) => {
+        dragging.current = false;
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
       }}
       onDoubleClick={() => setMainPct(45)}
     >
-      <div className="h-1 w-10 rounded-full bg-zinc-600" />
+      {/* pointer-events: none so the handle div, not this grip, is always
+          e.currentTarget for pointer capture */}
+      <div className="pointer-events-none h-1 w-12 rounded-full bg-zinc-600" />
     </div>
   );
 }
