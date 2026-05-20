@@ -7,6 +7,7 @@ import { getPolymarketMarkets } from './polymarket';
 import { getMndEvents } from './mnd';
 import { getRedditEvents } from './reddit';
 import { getWireEvents } from './wires';
+import { getTelegramEvents } from './telegram';
 import { classifyEvents } from './_classifier';
 
 export interface MergedResult {
@@ -44,7 +45,7 @@ async function timed<T>(
 }
 
 export async function getAllSources(): Promise<MergedResult> {
-  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, poly] = await Promise.all([
+  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, telegram, poly] = await Promise.all([
     timed('GDELT', getGdeltEvents, [] as IntelEvent[]),
     timed('FIRMS', getFirmsEvents, [] as IntelEvent[]),
     timed('ADSB', getAdsbEvents, [] as IntelEvent[]),
@@ -52,22 +53,19 @@ export async function getAllSources(): Promise<MergedResult> {
     timed('MND', getMndEvents, [] as IntelEvent[]),
     timed('RDDT', getRedditEvents, [] as IntelEvent[]),
     timed('WIRE', getWireEvents, [] as IntelEvent[]),
+    timed('TGRM', getTelegramEvents, [] as IntelEvent[]),
     timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
   ]);
 
-  // Items that come from structured sources we trust (counts, geocoded
-  // sensors) skip the classifier — they're already verified by virtue of
-  // the API contract. Only free-text sources go through the LLM gate.
-  const trustedSources = new Set(['NASA FIRMS', 'adsb.lol', 'USGS', 'Taiwan MND']);
+  // Trusted (structured / sensor) sources skip the LLM classifier.
+  // Free-text sources go through the gate so opinion / commemoration
+  // / diplomatic noise gets dropped.
   const trusted = [...firms.value, ...adsb.value, ...usgs.value, ...mnd.value];
-  const freeText = [...gdelt.value, ...reddit.value, ...wires.value];
+  const freeText = [...gdelt.value, ...reddit.value, ...wires.value, ...telegram.value];
 
   const classified = await classifyEvents(freeText);
   const allEvents = [...trusted, ...classified];
   allEvents.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-
-  // Mark trusted source events so UI can distinguish (no classifier needed)
-  void trustedSources;
 
   return {
     events: allEvents,
@@ -80,6 +78,7 @@ export async function getAllSources(): Promise<MergedResult> {
       mnd.status,
       reddit.status,
       wires.status,
+      telegram.status,
       poly.status,
     ],
     fetchedAt: new Date().toISOString(),
