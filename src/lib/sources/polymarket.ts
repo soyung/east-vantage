@@ -7,10 +7,12 @@ const GAMMA = 'https://gamma-api.polymarket.com/markets';
 const REQUEST_TIMEOUT_MS = 10_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-// Free-text search terms (Polymarket API supports a search-like filter via
-// `tag_id` for curated tags, but tag IDs change. Easier: pull recent active
-// markets + filter by keyword in title.)
-const KEYWORD_RX = /(taiwan|china|xi jinping|north korea|kim jong un|pyongyang|korean peninsula|seoul|tsmc|pla|dprk)/i;
+// Two-stage filter — must mention an East Asia security subject AND a
+// substantive geopolitical topic. Cuts out the "Will Trump say <word>"
+// meme markets that pass a one-word keyword filter.
+const REGION_RX = /(taiwan|china|xi jinping|north korea|kim jong un|pyongyang|korean peninsula|south korea|tsmc|pla|dprk|seoul|jeju|senkaku|ieodo)/i;
+const TOPIC_RX = /(invade|invasion|attack|war|nuclear|missile|test|launch|sanction|tariff|coup|leader|premier|president|election|fall|collapse|regime|escalation|conflict|incident|airspace|adiz|strait|chip|export control|reunif|annex|crisis|incursion|drill|exercise|ban|deal)/i;
+const EXCLUDE_RX = /(trump (say|tweet|post|mention|name|drop|use|wear)|will (he|she|trump|biden|kamala|musk) (say|mention|tweet|post|wear|drop))/i;
 
 interface GammaMarket {
   id: string;
@@ -50,7 +52,9 @@ async function fetchMarkets(): Promise<MarketCard[]> {
   const out: MarketCard[] = [];
   for (const m of data) {
     if (!m.question) continue;
-    if (!KEYWORD_RX.test(m.question)) continue;
+    if (EXCLUDE_RX.test(m.question)) continue;
+    if (!REGION_RX.test(m.question)) continue;
+    if (!TOPIC_RX.test(m.question)) continue;
 
     let yesPrice = 0;
     try {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { IntelEvent } from '@/lib/types';
 import { CATEGORY_LABEL, SEVERITY_COLOR, SEVERITY_RING, timeAgo } from '@/lib/format';
 
@@ -10,8 +11,19 @@ interface Props {
 }
 
 export default function EventCard({ event, selected, onSelect }: Props) {
+  const ref = useRef<HTMLButtonElement>(null);
+
+  // When this card becomes selected (e.g. user clicked a pin on the globe),
+  // scroll it into view inside whichever ancestor is actually scrollable
+  // (the aside on mobile, or the EventFeed's inner div on desktop).
+  useEffect(() => {
+    if (!selected) return;
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selected]);
+
   return (
     <button
+      ref={ref}
       onClick={() => onSelect(event.id)}
       className={`group flex w-full flex-col gap-1.5 border-l-2 px-4 py-3 text-left transition hover:bg-zinc-900/60 ${
         selected

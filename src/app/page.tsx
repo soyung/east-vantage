@@ -6,6 +6,7 @@ import Globe from '@/components/Globe';
 import EventFeed from '@/components/EventFeed';
 import FilterChips from '@/components/FilterChips';
 import MarketPanel from '@/components/MarketPanel';
+import SeverityLegend from '@/components/SeverityLegend';
 import { SAMPLE_EVENTS } from '@/lib/sample-events';
 import type {
   EventCategory,
@@ -118,6 +119,7 @@ export default function Home() {
             onCategoryToggle={toggleCategory}
           />
           {markets.length > 0 && <MarketPanel markets={markets} />}
+          <SeverityLegend />
           <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
         <main className="relative h-[45dvh] flex-shrink-0 md:h-auto md:flex-1">

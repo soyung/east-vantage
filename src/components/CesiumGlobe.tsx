@@ -119,11 +119,8 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
         handler.setInputAction((click: { position: { x: number; y: number } }) => {
           const picked = viewer.scene.pick(click.position as never);
           if (picked && picked.id && typeof picked.id.id === 'string') {
-            const id = picked.id.id as string;
-            if (id.startsWith('evt-')) {
-              onSelectRef.current(id);
-              return;
-            }
+            onSelectRef.current(picked.id.id as string);
+            return;
           }
           onSelectRef.current(null);
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -146,15 +143,14 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
     };
   }, []);
 
+  // Sync event entities. removeAll is safe since ADIZ zones are not rendered;
+  // when zones come back, switch to tracked-IDs deletion.
   useEffect(() => {
     const viewer = viewerRef.current;
     const Cesium = CesiumRef.current;
     if (!viewer || !Cesium) return;
 
-    const existing = viewer.entities.values
-      .filter((e) => typeof e.id === 'string' && (e.id as string).startsWith('evt-'))
-      .slice();
-    for (const e of existing) viewer.entities.remove(e);
+    viewer.entities.removeAll();
 
     for (const evt of events) {
       const isSel = evt.id === selectedId;
@@ -163,20 +159,22 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
         id: evt.id,
         position: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat),
         point: {
-          pixelSize: isSel ? 18 : 12,
+          pixelSize: isSel ? 20 : 11,
           color,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: isSel ? 3 : 1.5,
+          outlineColor: isSel
+            ? Cesium.Color.fromCssColorString('#fbbf24')
+            : Cesium.Color.WHITE,
+          outlineWidth: isSel ? 4 : 1.5,
         },
         label: isSel
           ? {
-              text: evt.title,
+              text: evt.title.length > 60 ? evt.title.slice(0, 57) + '...' : evt.title,
               font: '13px sans-serif',
               fillColor: Cesium.Color.WHITE,
               outlineColor: Cesium.Color.BLACK,
               outlineWidth: 2,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, -22),
+              pixelOffset: new Cesium.Cartesian2(0, -28),
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
               showBackground: true,
               backgroundColor: Cesium.Color.fromCssColorString('#0a0a0acc'),
@@ -186,6 +184,20 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
       });
     }
   }, [events, selectedId, ready]);
+
+  // Fly camera to the selected event so a click on a tiny dot reveals
+  // where you actually are.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = CesiumRef.current;
+    if (!viewer || !Cesium || !selectedId) return;
+    const evt = events.find((e) => e.id === selectedId);
+    if (!evt) return;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat, 900_000),
+      duration: 1.0,
+    });
+  }, [selectedId, events, ready]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
