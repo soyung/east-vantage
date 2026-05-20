@@ -10,16 +10,38 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+const LANG_FLAG: Record<string, { label: string; tone: string }> = {
+  en: { label: 'EN', tone: 'bg-zinc-700 text-zinc-300' },
+  ko: { label: 'KR', tone: 'bg-blue-900/60 text-blue-200' },
+  ja: { label: 'JP', tone: 'bg-rose-900/60 text-rose-200' },
+  zh: { label: 'ZH', tone: 'bg-amber-900/60 text-amber-200' },
+};
+
+// Tags that are meta-signals about provenance / classifier confidence.
+// These get rendered as inline icons, not as visible chips.
+const META_TAGS = new Set(['unverified', 'low-confidence']);
+
+function extractLang(tags: string[] | undefined): string | null {
+  if (!tags) return null;
+  for (const t of tags) {
+    const m = /^lang:(\w+)$/.exec(t);
+    if (m && LANG_FLAG[m[1]]) return m[1];
+  }
+  return null;
+}
+
 export default function EventCard({ event, selected, onSelect }: Props) {
   const ref = useRef<HTMLButtonElement>(null);
 
-  // When this card becomes selected (e.g. user clicked a pin on the globe),
-  // scroll it into view inside whichever ancestor is actually scrollable
-  // (the aside on mobile, or the EventFeed's inner div on desktop).
   useEffect(() => {
     if (!selected) return;
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [selected]);
+
+  const lang = extractLang(event.tags);
+  const isUnverified = event.tags?.includes('unverified');
+  const isLowConfidence = event.tags?.includes('low-confidence');
+  const visibleTags = event.tags?.filter((t) => !META_TAGS.has(t) && !t.startsWith('lang:')) ?? [];
 
   return (
     <button
@@ -36,13 +58,37 @@ export default function EventCard({ event, selected, onSelect }: Props) {
         <span>{CATEGORY_LABEL[event.category]}</span>
         <span className="text-zinc-700">·</span>
         <span>{timeAgo(event.timestamp)}</span>
-        <span className="ml-auto text-zinc-600">{event.source}</span>
+        {lang && (
+          <span
+            className={`rounded px-1 py-px text-[9px] font-semibold tracking-wide ${LANG_FLAG[lang].tone}`}
+            title={`Source language: ${LANG_FLAG[lang].label}`}
+          >
+            {LANG_FLAG[lang].label}
+          </span>
+        )}
+        {isLowConfidence && (
+          <span
+            className="rounded bg-amber-900/40 px-1 py-px text-[9px] font-semibold tracking-wide text-amber-300"
+            title="LLM classifier confidence below threshold"
+          >
+            LO-CONF
+          </span>
+        )}
+        {isUnverified && !isLowConfidence && (
+          <span
+            className="text-zinc-700"
+            title="No classifier verification (key not set or skipped)"
+          >
+            ⚬
+          </span>
+        )}
+        <span className="ml-auto truncate text-zinc-600">{event.source}</span>
       </div>
       <div className="text-sm font-medium leading-snug text-zinc-100">{event.title}</div>
       <div className="line-clamp-2 text-xs leading-relaxed text-zinc-400">{event.summary}</div>
-      {event.tags && event.tags.length > 0 && (
+      {visibleTags.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
-          {event.tags.map((t) => (
+          {visibleTags.map((t) => (
             <span
               key={t}
               className="rounded bg-zinc-800/60 px-1.5 py-0.5 text-[10px] text-zinc-400"
