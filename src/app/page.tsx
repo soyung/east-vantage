@@ -17,17 +17,6 @@ import type {
   SourceStatus,
 } from '@/lib/types';
 
-const ALL_CATEGORIES: EventCategory[] = [
-  'air',
-  'naval',
-  'missile',
-  'cyber',
-  'satellite',
-  'seismic',
-  'diplomatic',
-  'economic',
-];
-
 type DataSource = 'loading' | 'live' | 'sample';
 
 interface EventsResponse {
@@ -48,9 +37,7 @@ export default function Home() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeRegion, setActiveRegion] = useState<EventRegion | 'all'>('all');
-  const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
-    new Set(ALL_CATEGORIES),
-  );
+  const [activeCategory, setActiveCategory] = useState<EventCategory | 'all'>('all');
   // Mobile-only: globe height as % of viewport. Drag the handle to resize.
   const [mobileMainPct, setMobileMainPct] = useState(45);
 
@@ -84,24 +71,35 @@ export default function Home() {
     };
   }, []);
 
-  const filtered = useMemo(() => {
-    return events
-      .filter((e) => {
-        if (activeRegion !== 'all' && e.region !== activeRegion) return false;
-        if (!activeCategories.has(e.category)) return false;
-        return true;
-      })
-      .sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-  }, [events, activeRegion, activeCategories]);
+  // After region filter only — used for chip counts so the user sees how
+  // many events each category has within their current region selection.
+  const regionFiltered = useMemo(
+    () => (activeRegion === 'all' ? events : events.filter((e) => e.region === activeRegion)),
+    [events, activeRegion],
+  );
 
-  const toggleCategory = (c: EventCategory) => {
-    setActiveCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      return next;
-    });
-  };
+  const categoryCounts = useMemo(() => {
+    const counts: Record<EventCategory, number> = {
+      air: 0,
+      naval: 0,
+      missile: 0,
+      cyber: 0,
+      satellite: 0,
+      seismic: 0,
+      diplomatic: 0,
+      economic: 0,
+    };
+    for (const e of regionFiltered) counts[e.category]++;
+    return counts;
+  }, [regionFiltered]);
+
+  const filtered = useMemo(() => {
+    const base =
+      activeCategory === 'all'
+        ? regionFiltered
+        : regionFiltered.filter((e) => e.category === activeCategory);
+    return [...base].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+  }, [regionFiltered, activeCategory]);
 
   return (
     <div className="flex h-screen flex-col bg-[#05070d] text-zinc-100">
@@ -120,9 +118,11 @@ export default function Home() {
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:overflow-hidden">
             <FilterChips
               activeRegion={activeRegion}
-              activeCategories={activeCategories}
+              activeCategory={activeCategory}
+              categoryCounts={categoryCounts}
+              totalCount={regionFiltered.length}
               onRegionChange={setActiveRegion}
-              onCategoryToggle={toggleCategory}
+              onCategoryChange={setActiveCategory}
             />
             {markets.length > 0 && <MarketPanel markets={markets} />}
             <SeverityLegend />
