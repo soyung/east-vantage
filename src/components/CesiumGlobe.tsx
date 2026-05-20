@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { IntelEvent } from '@/lib/types';
-import { ZONES } from '@/lib/zones';
 
 // We deliberately do NOT `import 'cesium'`. The npm package's source modules
 // contain syntax that some modern bundlers re-emit in a way that breaks under
@@ -112,26 +111,9 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
           duration: 0,
         });
 
-        for (const zone of ZONES) {
-          viewer.entities.add({
-            id: `zone-${zone.id}`,
-            name: zone.name,
-            polygon: {
-              hierarchy: new Cesium.PolygonHierarchy(
-                Cesium.Cartesian3.fromDegreesArray(zone.polygon.flat()),
-              ),
-              material: Cesium.Color.fromBytes(...zone.color),
-              outline: true,
-              outlineColor: Cesium.Color.fromBytes(
-                zone.color[0],
-                zone.color[1],
-                zone.color[2],
-                200,
-              ),
-              height: 0,
-            },
-          });
-        }
+        // ADIZ overlay polygons are intentionally not rendered here. They
+        // looked like crude rectangles. When real GeoJSON boundaries land,
+        // re-enable by iterating ZONES (kept in src/lib/zones.ts).
 
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         handler.setInputAction((click: { position: { x: number; y: number } }) => {

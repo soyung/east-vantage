@@ -107,10 +107,10 @@ export default function Home() {
         fetchedAt={fetchedAt}
         sources={sources}
       />
-      {/* Mobile: globe on top (45vh), sidebar below scrollable.
-          Desktop (md+): sidebar left 380px fixed, globe fills the rest. */}
+      {/* Mobile: globe pinned at top 45dvh, sidebar fills rest (scrolls).
+          Desktop (md+): sidebar 380px left, globe fills rest. */}
       <div className="flex flex-1 flex-col-reverse overflow-hidden md:flex-row">
-        <aside className="flex h-[55dvh] min-h-0 w-full flex-shrink-0 flex-col border-zinc-800 bg-[#070a10] md:h-auto md:w-[380px] md:border-r">
+        <aside className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#070a10] md:w-[380px] md:flex-none md:overflow-hidden md:border-r md:border-zinc-800">
           <FilterChips
             activeRegion={activeRegion}
             activeCategories={activeCategories}
@@ -120,7 +120,7 @@ export default function Home() {
           {markets.length > 0 && <MarketPanel markets={markets} />}
           <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
-        <main className="relative h-[45dvh] flex-1 md:h-auto">
+        <main className="relative h-[45dvh] flex-shrink-0 md:h-auto md:flex-1">
           <Globe events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </main>
       </div>
