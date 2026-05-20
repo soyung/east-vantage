@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "node scripts/copy-cesium-assets.mjs"
+    "postinstall": "node scripts/copy-cesium-assets.mjs",
+    "eval-classifier": "node scripts/eval-classifier.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "cesium": "^1.141.0",
     "next": "16.2.6",
     "react": "19.2.4",

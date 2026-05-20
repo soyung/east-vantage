@@ -1,0 +1,40 @@
+{"id":"tp-1","title":"24 PLA sorties cross median line into southwestern ADIZ","summary":"Taiwan MND daily report","expected_keep":true,"expected_category":"air"}
+{"id":"tp-2","title":"DPRK launches Hwasong-19 ICBM from Pyongyang","summary":"KCNA confirms test","expected_keep":true,"expected_category":"missile"}
+{"id":"tp-3","title":"PLAN Shandong carrier group transits Bashi Channel","summary":"AIS tracking confirms route","expected_keep":true,"expected_category":"naval"}
+{"id":"tp-4","title":"Thermal anomaly detected at Yongbyon reactor","summary":"NASA FIRMS","expected_keep":true,"expected_category":"satellite"}
+{"id":"tp-5","title":"M4.5 earthquake near Punggye-ri possible nuclear test","summary":"USGS","expected_keep":true,"expected_category":"seismic"}
+{"id":"tp-6","title":"APT41 cyber intrusion at Taiwan semiconductor supplier","summary":"TWCERT advisory","expected_keep":true,"expected_category":"cyber"}
+{"id":"tp-7","title":"中國33機艦擾台 國防部公布清晰影像","summary":"Taiwan MND CN","expected_keep":true,"expected_category":"air"}
+{"id":"tp-8","title":"北 동해상으로 단거리 탄도미사일 1발 발사","summary":"합참","expected_keep":true,"expected_category":"missile"}
+{"id":"tp-9","title":"中国海警船が尖閣周辺で領海侵入","summary":"海上保安庁","expected_keep":true,"expected_category":"naval"}
+{"id":"tp-10","title":"USAF B-1B Lancers join trilateral exercise over Yellow Sea","summary":"USFK statement","expected_keep":true,"expected_category":"air"}
+{"id":"tp-11","title":"PLAAF J-20 spotted near Taiwan ADIZ","summary":"OSINT photo","expected_keep":true,"expected_category":"air"}
+{"id":"tp-12","title":"DPRK fires cruise missile cluster toward Sea of Japan","summary":"NHK","expected_keep":true,"expected_category":"missile"}
+{"id":"tp-13","title":"PLA submarine surfaces near Okinawa","summary":"JMSDF P-3C tracking","expected_keep":true,"expected_category":"naval"}
+{"id":"tp-14","title":"South Korean F-35As scramble for KADIZ incursion","summary":"ROK MND","expected_keep":true,"expected_category":"air"}
+{"id":"tp-15","title":"Chinese coast guard vessels enter Senkaku contiguous zone","summary":"JCG patrol","expected_keep":true,"expected_category":"naval"}
+{"id":"tp-16","title":"NK fuel-rod removal observed at Yongbyon via satellite","summary":"38 North","expected_keep":true,"expected_category":"satellite"}
+{"id":"tp-17","title":"Taiwan tracks 9 PLA balloons over central ADIZ","summary":"MND","expected_keep":true,"expected_category":"air"}
+{"id":"tp-18","title":"DPRK conducts solid-fuel engine test at Sohae","summary":"KCNA","expected_keep":true,"expected_category":"missile"}
+{"id":"tp-19","title":"PLA fires live ordnance in 2024 exercise zone around Taiwan","summary":"NOTAM","expected_keep":true,"expected_category":"missile"}
+{"id":"tp-20","title":"Suspected DPRK cyber heist of $50M from S Korean exchange","summary":"Lazarus attribution","expected_keep":true,"expected_category":"cyber"}
+{"id":"tn-1","title":"South Korea, Japan to boost energy cooperation in face of Mideast crisis","summary":"Yonhap","expected_keep":false}
+{"id":"tn-2","title":"Senior U.S. diplomat to visit Seoul to launch working groups on alliance","summary":"diplomatic","expected_keep":false}
+{"id":"tn-3","title":"Demining the Strait of Hormuz: Q&A with Scott Savitz","summary":"Middle East","expected_keep":false}
+{"id":"tn-4","title":"挺過飛彈危機30年 卓榮泰: 台灣迎來最好經濟體質","summary":"30-year anniversary commemoration","expected_keep":false}
+{"id":"tn-5","title":"BTS member Jin returns to military service in South Korea","summary":"K-pop news","expected_keep":false}
+{"id":"tn-6","title":"Taiwan Premier discusses next year defense budget","summary":"budget speech","expected_keep":false}
+{"id":"tn-7","title":"Kim Jong Un meets Russian envoy in Pyongyang","summary":"diplomatic meeting","expected_keep":false}
+{"id":"tn-8","title":"China-Japan agree to resume seafood imports talks","summary":"trade diplomacy","expected_keep":false}
+{"id":"tn-9","title":"Squid Game season 3 release date announced","summary":"entertainment","expected_keep":false}
+{"id":"tn-10","title":"Op-ed: How Beijing might escalate over Taiwan in 2027","summary":"speculation","expected_keep":false}
+{"id":"tn-11","title":"Park Hong-keun leads Seoul mayoral race in latest poll","summary":"election news","expected_keep":false}
+{"id":"tn-12","title":"How athletes have helped bridge the inter-Korean divide","summary":"feature","expected_keep":false}
+{"id":"tn-13","title":"TSMC reports Q1 earnings beat","summary":"corporate","expected_keep":false}
+{"id":"tn-14","title":"国台办: 賴清德上台两年所作所为越来越不得人心","summary":"PRC propaganda commentary","expected_keep":false}
+{"id":"tn-15","title":"North Korean defector tells story in new documentary","summary":"feature","expected_keep":false}
+{"id":"tn-16","title":"Will China invade Taiwan by end of 2026?","summary":"Polymarket prediction","expected_keep":false}
+{"id":"tn-17","title":"Japan PM unveils economic stimulus package","summary":"econ policy","expected_keep":false}
+{"id":"tn-18","title":"Seoul to host G7 foreign ministers summit","summary":"summit","expected_keep":false}
+{"id":"tn-19","title":"Xi Jinping condemns US sanctions in UN speech","summary":"diplomatic statement","expected_keep":false}
+{"id":"tn-20","title":"Korean BBQ recipe goes viral on TikTok","summary":"food culture","expected_keep":false}

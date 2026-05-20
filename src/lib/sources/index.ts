@@ -7,6 +7,7 @@ import { getPolymarketMarkets } from './polymarket';
 import { getMndEvents } from './mnd';
 import { getRedditEvents } from './reddit';
 import { getWireEvents } from './wires';
+import { classifyEvents } from './_classifier';
 
 export interface MergedResult {
   events: IntelEvent[];
@@ -54,16 +55,19 @@ export async function getAllSources(): Promise<MergedResult> {
     timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
   ]);
 
-  const allEvents = [
-    ...gdelt.value,
-    ...firms.value,
-    ...adsb.value,
-    ...usgs.value,
-    ...mnd.value,
-    ...reddit.value,
-    ...wires.value,
-  ];
+  // Items that come from structured sources we trust (counts, geocoded
+  // sensors) skip the classifier — they're already verified by virtue of
+  // the API contract. Only free-text sources go through the LLM gate.
+  const trustedSources = new Set(['NASA FIRMS', 'adsb.lol', 'USGS', 'Taiwan MND']);
+  const trusted = [...firms.value, ...adsb.value, ...usgs.value, ...mnd.value];
+  const freeText = [...gdelt.value, ...reddit.value, ...wires.value];
+
+  const classified = await classifyEvents(freeText);
+  const allEvents = [...trusted, ...classified];
   allEvents.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
+
+  // Mark trusted source events so UI can distinguish (no classifier needed)
+  void trustedSources;
 
   return {
     events: allEvents,
