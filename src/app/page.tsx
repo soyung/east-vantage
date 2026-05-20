@@ -114,21 +114,24 @@ export default function Home() {
       {/* Mobile: globe at top (resizable via SplitHandle), sidebar fills rest.
           Desktop (md+): sidebar 380px left, globe fills rest. */}
       <div className="flex flex-1 flex-col-reverse overflow-hidden md:flex-row">
-        <aside className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#070a10] md:w-[380px] md:flex-none md:overflow-hidden md:border-r md:border-zinc-800">
+        <aside className="flex min-h-0 w-full flex-1 flex-col bg-[#070a10] md:w-[380px] md:flex-none md:border-r md:border-zinc-800">
+          {/* Drag handle stays put — outside the scrollable region */}
           <SplitHandle mainPct={mobileMainPct} setMainPct={setMobileMainPct} />
-          <FilterChips
-            activeRegion={activeRegion}
-            activeCategories={activeCategories}
-            onRegionChange={setActiveRegion}
-            onCategoryToggle={toggleCategory}
-          />
-          {markets.length > 0 && <MarketPanel markets={markets} />}
-          <SeverityLegend />
-          <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:overflow-hidden">
+            <FilterChips
+              activeRegion={activeRegion}
+              activeCategories={activeCategories}
+              onRegionChange={setActiveRegion}
+              onCategoryToggle={toggleCategory}
+            />
+            {markets.length > 0 && <MarketPanel markets={markets} />}
+            <SeverityLegend />
+            <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+          </div>
         </aside>
         <main
-          className="relative flex-shrink-0 md:h-auto md:flex-1"
-          style={{ height: `${mobileMainPct}dvh` }}
+          className="relative h-[var(--main-h)] flex-shrink-0 md:h-auto md:flex-1"
+          style={{ '--main-h': `${mobileMainPct}dvh` } as React.CSSProperties}
         >
           <Globe events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </main>
