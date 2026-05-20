@@ -26,7 +26,13 @@ const TITLE_KEYWORD_RX =
   /(missile|launch|aircraft|sortie|scramble|incursion|drill|exercise|breach|crossed|fire|test|naval|vessel|warship|carrier|adiz|median line|warning)/i;
 
 const REQUEST_TIMEOUT_MS = 25_000;
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// Successful response is cached for 15 min — well past GDELT's typical
+// edge-of-rate-limit recovery window and few enough hits/hour that the
+// shared iad1 egress IPs stay clean.
+const CACHE_TTL_MS = 15 * 60 * 1000;
+// After any failure (429, timeout, etc.) wait this long before trying
+// again. Stops us hammering GDELT and earning more 429s.
+const FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
 
 interface GdeltArticle {
   url: string;
@@ -147,10 +153,16 @@ interface CacheEntry {
 }
 let cache: CacheEntry | null = null;
 let inflight: Promise<IntelEvent[]> | null = null;
+let nextAttemptAfter = 0;
 
 export async function getGdeltEvents(): Promise<IntelEvent[]> {
   const now = Date.now();
   if (cache && now - cache.at < CACHE_TTL_MS) return cache.events;
+
+  if (now < nextAttemptAfter) {
+    if (cache) return cache.events;
+    throw new Error('GDELT in cooldown after recent failure');
+  }
 
   if (!inflight) {
     inflight = fetchArticles()
@@ -165,7 +177,8 @@ export async function getGdeltEvents(): Promise<IntelEvent[]> {
     cache = { events, at: now };
     return events;
   } catch (err) {
-    if (cache) return cache.events; // stale-while-error
+    nextAttemptAfter = now + FAILURE_COOLDOWN_MS;
+    if (cache) return cache.events;
     throw err;
   }
 }
