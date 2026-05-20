@@ -1,42 +1,62 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import {
-  Viewer as ResiumViewer,
-  Entity,
-  PolygonGraphics,
-  PointGraphics,
-  LabelGraphics,
-  CameraFlyTo,
-} from 'resium';
-import {
-  Cartesian3,
-  Color,
-  Ion,
-  LabelStyle,
-  VerticalOrigin,
-  HeightReference,
-  Cartesian2,
-  type Viewer,
-} from 'cesium';
-
-import 'cesium/Build/Cesium/Widgets/widgets.css';
-
 import type { IntelEvent } from '@/lib/types';
 import { ZONES } from '@/lib/zones';
 
-const TOKEN = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
-if (TOKEN) {
-  Ion.defaultAccessToken = TOKEN;
+// We deliberately do NOT `import 'cesium'`. The npm package's source modules
+// contain syntax that some modern bundlers re-emit in a way that breaks under
+// strict-mode parsing. Instead we load the prebuilt IIFE script at runtime
+// and use the resulting global. Cesium static files are copied into
+// /public/cesium by scripts/copy-cesium-assets.mjs.
+
+type CesiumNS = typeof import('cesium');
+
+declare global {
+  interface Window {
+    Cesium?: CesiumNS;
+    CESIUM_BASE_URL?: string;
+    __cesiumLoadingPromise?: Promise<CesiumNS>;
+  }
 }
 
-const SEVERITY_TO_CESIUM_COLOR: Record<string, Color> = {
-  info: Color.fromCssColorString('#a1a1aa'),
-  low: Color.fromCssColorString('#10b981'),
-  medium: Color.fromCssColorString('#f59e0b'),
-  high: Color.fromCssColorString('#f97316'),
-  critical: Color.fromCssColorString('#dc2626'),
+const SEVERITY_HEX: Record<string, string> = {
+  info: '#a1a1aa',
+  low: '#10b981',
+  medium: '#f59e0b',
+  high: '#f97316',
+  critical: '#dc2626',
 };
+
+function loadCesium(): Promise<CesiumNS> {
+  if (window.Cesium) return Promise.resolve(window.Cesium);
+  if (window.__cesiumLoadingPromise) return window.__cesiumLoadingPromise;
+
+  window.CESIUM_BASE_URL = '/cesium';
+
+  const cssId = 'cesium-widgets-css';
+  if (!document.getElementById(cssId)) {
+    const link = document.createElement('link');
+    link.id = cssId;
+    link.rel = 'stylesheet';
+    link.href = '/cesium/Widgets/widgets.css';
+    document.head.appendChild(link);
+  }
+
+  window.__cesiumLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/cesium/Cesium.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.Cesium) resolve(window.Cesium);
+      else reject(new Error('Cesium loaded but window.Cesium is undefined'));
+    };
+    script.onerror = () => reject(new Error('Failed to load /cesium/Cesium.js'));
+    document.head.appendChild(script);
+  });
+
+  return window.__cesiumLoadingPromise;
+}
 
 interface CesiumGlobeProps {
   events: IntelEvent[];
@@ -45,93 +65,144 @@ interface CesiumGlobeProps {
 }
 
 export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlobeProps) {
-  const viewerRef = useRef<{ cesiumElement?: Viewer }>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<InstanceType<CesiumNS['Viewer']> | null>(null);
+  const CesiumRef = useRef<CesiumNS | null>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
-    const viewer = viewerRef.current?.cesiumElement;
-    if (!viewer) return;
-    viewer.scene.globe.enableLighting = false;
-    if (viewer.scene.skyAtmosphere) {
-      viewer.scene.skyAtmosphere.show = true;
-    }
-    viewer.scene.backgroundColor = Color.fromCssColorString('#05070d');
-    viewer.scene.globe.baseColor = Color.fromCssColorString('#0b1220');
-    // hide default credits chrome a bit
-    const creditContainer = viewer.creditDisplay.container as HTMLElement;
-    if (creditContainer) {
-      creditContainer.style.color = '#71717a';
-      creditContainer.style.fontSize = '10px';
-    }
+    let cancelled = false;
+
+    loadCesium()
+      .then((Cesium) => {
+        if (cancelled || !containerRef.current) return;
+        CesiumRef.current = Cesium;
+
+        const token = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
+        if (token) Cesium.Ion.defaultAccessToken = token;
+
+        const viewer = new Cesium.Viewer(containerRef.current, {
+          timeline: false,
+          animation: false,
+          baseLayerPicker: false,
+          navigationHelpButton: false,
+          homeButton: false,
+          geocoder: false,
+          sceneModePicker: false,
+          infoBox: false,
+          selectionIndicator: false,
+          fullscreenButton: false,
+        });
+
+        viewer.scene.globe.enableLighting = false;
+        if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
+        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#05070d');
+        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0b1220');
+
+        const credit = viewer.creditDisplay.container as HTMLElement;
+        if (credit) {
+          credit.style.color = '#71717a';
+          credit.style.fontSize = '10px';
+        }
+
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(125, 28, 6_500_000),
+          duration: 0,
+        });
+
+        for (const zone of ZONES) {
+          viewer.entities.add({
+            id: `zone-${zone.id}`,
+            name: zone.name,
+            polygon: {
+              hierarchy: new Cesium.PolygonHierarchy(
+                Cesium.Cartesian3.fromDegreesArray(zone.polygon.flat()),
+              ),
+              material: Cesium.Color.fromBytes(...zone.color),
+              outline: true,
+              outlineColor: Cesium.Color.fromBytes(
+                zone.color[0],
+                zone.color[1],
+                zone.color[2],
+                200,
+              ),
+              height: 0,
+            },
+          });
+        }
+
+        const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction((click: { position: { x: number; y: number } }) => {
+          const picked = viewer.scene.pick(click.position as never);
+          if (picked && picked.id && typeof picked.id.id === 'string') {
+            const id = picked.id.id as string;
+            if (id.startsWith('evt-')) {
+              onSelectRef.current(id);
+              return;
+            }
+          }
+          onSelectRef.current(null);
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+        viewerRef.current = viewer;
+      })
+      .catch((err) => {
+        console.error('[CesiumGlobe] init failed:', err);
+      });
+
+    return () => {
+      cancelled = true;
+      try {
+        viewerRef.current?.destroy();
+      } catch {
+        // ignore
+      }
+      viewerRef.current = null;
+    };
   }, []);
 
-  return (
-    <ResiumViewer
-      ref={viewerRef}
-      full={false}
-      timeline={false}
-      animation={false}
-      baseLayerPicker={false}
-      navigationHelpButton={false}
-      homeButton={false}
-      geocoder={false}
-      sceneModePicker={false}
-      infoBox={false}
-      selectionIndicator={false}
-      fullscreenButton={false}
-      style={{ width: '100%', height: '100%' }}
-    >
-      <CameraFlyTo
-        once
-        duration={0}
-        destination={Cartesian3.fromDegrees(125, 28, 6_500_000)}
-      />
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = CesiumRef.current;
+    if (!viewer || !Cesium) return;
 
-      {ZONES.map((zone) => (
-        <Entity key={zone.id} name={zone.name}>
-          <PolygonGraphics
-            hierarchy={Cartesian3.fromDegreesArray(zone.polygon.flat())}
-            material={Color.fromBytes(...zone.color)}
-            outline
-            outlineColor={Color.fromBytes(zone.color[0], zone.color[1], zone.color[2], 200)}
-            height={0}
-          />
-        </Entity>
-      ))}
+    const existing = viewer.entities.values
+      .filter((e) => typeof e.id === 'string' && (e.id as string).startsWith('evt-'))
+      .slice();
+    for (const e of existing) viewer.entities.remove(e);
 
-      {events.map((evt) => {
-        const isSelected = evt.id === selectedId;
-        const color = SEVERITY_TO_CESIUM_COLOR[evt.severity] ?? Color.WHITE;
-        return (
-          <Entity
-            key={evt.id}
-            position={Cartesian3.fromDegrees(evt.lon, evt.lat)}
-            onClick={() => onSelect(evt.id)}
-          >
-            <PointGraphics
-              pixelSize={isSelected ? 18 : 12}
-              color={color}
-              outlineColor={Color.WHITE}
-              outlineWidth={isSelected ? 3 : 1.5}
-              heightReference={HeightReference.CLAMP_TO_GROUND}
-            />
-            {isSelected && (
-              <LabelGraphics
-                text={evt.title}
-                font="13px sans-serif"
-                fillColor={Color.WHITE}
-                outlineColor={Color.BLACK}
-                outlineWidth={2}
-                style={LabelStyle.FILL_AND_OUTLINE}
-                pixelOffset={new Cartesian2(0, -22)}
-                verticalOrigin={VerticalOrigin.BOTTOM}
-                showBackground
-                backgroundColor={Color.fromCssColorString('#0a0a0acc')}
-                backgroundPadding={new Cartesian2(8, 6)}
-              />
-            )}
-          </Entity>
-        );
-      })}
-    </ResiumViewer>
-  );
+    for (const evt of events) {
+      const isSel = evt.id === selectedId;
+      const color = Cesium.Color.fromCssColorString(SEVERITY_HEX[evt.severity] ?? '#ffffff');
+      viewer.entities.add({
+        id: evt.id,
+        position: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat),
+        point: {
+          pixelSize: isSel ? 18 : 12,
+          color,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: isSel ? 3 : 1.5,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        },
+        label: isSel
+          ? {
+              text: evt.title,
+              font: '13px sans-serif',
+              fillColor: Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(0, -22),
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              showBackground: true,
+              backgroundColor: Cesium.Color.fromCssColorString('#0a0a0acc'),
+              backgroundPadding: new Cesium.Cartesian2(8, 6),
+            }
+          : undefined,
+      });
+    }
+  }, [events, selectedId]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
 }
