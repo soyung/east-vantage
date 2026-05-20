@@ -7,8 +7,9 @@ const CATEGORIES: EventCategory[] = [
   'air',
   'naval',
   'missile',
-  'cyber',
   'satellite',
+  'seismic',
+  'cyber',
   'diplomatic',
   'economic',
 ];

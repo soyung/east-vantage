@@ -31,6 +31,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   missile: 'Missile',
   cyber: 'Cyber',
   satellite: 'Satellite',
+  seismic: 'Seismic',
   diplomatic: 'Diplomatic',
   economic: 'Economic',
 };

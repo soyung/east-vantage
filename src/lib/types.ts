@@ -4,6 +4,7 @@ export type EventCategory =
   | 'missile'
   | 'cyber'
   | 'satellite'
+  | 'seismic'
   | 'diplomatic'
   | 'economic';
 
@@ -32,4 +33,22 @@ export interface AdizZone {
   shortName: string;
   color: [number, number, number, number];
   polygon: Array<[number, number]>;
+}
+
+export interface MarketCard {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  yesPrice: number; // 0–1
+  volume?: number; // in USD or native units
+  endDate?: string;
+}
+
+export interface SourceStatus {
+  name: string;
+  ok: boolean;
+  count: number;
+  durationMs: number;
+  error?: string;
 }

@@ -5,8 +5,15 @@ import Header from '@/components/Header';
 import Globe from '@/components/Globe';
 import EventFeed from '@/components/EventFeed';
 import FilterChips from '@/components/FilterChips';
+import MarketPanel from '@/components/MarketPanel';
 import { SAMPLE_EVENTS } from '@/lib/sample-events';
-import type { EventCategory, EventRegion, IntelEvent } from '@/lib/types';
+import type {
+  EventCategory,
+  EventRegion,
+  IntelEvent,
+  MarketCard,
+  SourceStatus,
+} from '@/lib/types';
 
 const ALL_CATEGORIES: EventCategory[] = [
   'air',
@@ -14,23 +21,26 @@ const ALL_CATEGORIES: EventCategory[] = [
   'missile',
   'cyber',
   'satellite',
+  'seismic',
   'diplomatic',
   'economic',
 ];
 
-type DataSource = 'loading' | 'gdelt' | 'gdelt-stale' | 'sample';
+type DataSource = 'loading' | 'live' | 'sample';
 
 interface EventsResponse {
   events: IntelEvent[];
-  source: 'gdelt' | 'gdelt-stale' | 'sample';
+  markets: MarketCard[];
+  sources: SourceStatus[];
+  source: 'live' | 'sample';
   fetchedAt?: string;
-  reason?: string;
   error?: string;
-  warning?: string;
 }
 
 export default function Home() {
   const [events, setEvents] = useState<IntelEvent[]>(SAMPLE_EVENTS);
+  const [markets, setMarkets] = useState<MarketCard[]>([]);
+  const [sources, setSources] = useState<SourceStatus[]>([]);
   const [dataSource, setDataSource] = useState<DataSource>('loading');
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
 
@@ -49,6 +59,8 @@ export default function Home() {
         const data = (await res.json()) as EventsResponse;
         if (cancelled) return;
         setEvents(data.events.length > 0 ? data.events : SAMPLE_EVENTS);
+        setMarkets(data.markets ?? []);
+        setSources(data.sources ?? []);
         setDataSource(data.source);
         setFetchedAt(data.fetchedAt ?? new Date().toISOString());
       } catch (err) {
@@ -61,7 +73,6 @@ export default function Home() {
     }
 
     load();
-    // Refresh every 5 min so the feed stays live.
     const id = setInterval(load, 5 * 60 * 1000);
     return () => {
       cancelled = true;
@@ -90,7 +101,12 @@ export default function Home() {
 
   return (
     <div className="flex h-screen flex-col bg-[#05070d] text-zinc-100">
-      <Header eventCount={filtered.length} dataSource={dataSource} fetchedAt={fetchedAt} />
+      <Header
+        eventCount={filtered.length}
+        dataSource={dataSource}
+        fetchedAt={fetchedAt}
+        sources={sources}
+      />
       <div className="flex flex-1 overflow-hidden">
         <aside className="flex w-[380px] flex-shrink-0 flex-col border-r border-zinc-800 bg-[#070a10]">
           <FilterChips
@@ -99,6 +115,7 @@ export default function Home() {
             onRegionChange={setActiveRegion}
             onCategoryToggle={toggleCategory}
           />
+          {markets.length > 0 && <MarketPanel markets={markets} />}
           <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
         <main className="relative flex-1">

@@ -1,36 +1,25 @@
 import Clock from './Clock';
-import { timeAgo } from '@/lib/format';
+import type { SourceStatus } from '@/lib/types';
 
 interface Props {
   eventCount: number;
-  dataSource: 'loading' | 'gdelt' | 'gdelt-stale' | 'sample';
+  dataSource: 'loading' | 'live' | 'sample';
   fetchedAt: string | null;
+  sources: SourceStatus[];
 }
 
-export default function Header({ eventCount, dataSource, fetchedAt }: Props) {
-  const isLive = dataSource === 'gdelt';
-  const isStale = dataSource === 'gdelt-stale';
+function SourceDot({ s }: { s: SourceStatus }) {
+  const color = !s.ok ? 'bg-red-500' : s.count === 0 ? 'bg-amber-500' : 'bg-emerald-500';
+  const title = `${s.name}: ${s.ok ? `${s.count} items` : (s.error ?? 'failed')} · ${s.durationMs}ms`;
+  return (
+    <div className="flex items-center gap-1" title={title}>
+      <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
+      <span className="text-[10px] font-medium tracking-wide text-zinc-400">{s.name}</span>
+    </div>
+  );
+}
 
-  const sourceLabel =
-    dataSource === 'loading'
-      ? 'loading…'
-      : isLive
-        ? `GDELT 2.0${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ''}`
-        : isStale
-          ? `GDELT 2.0 · stale${fetchedAt ? ` · ${timeAgo(fetchedAt)}` : ''}`
-          : 'sample data';
-
-  const sourceTone = isLive
-    ? 'text-emerald-400'
-    : isStale
-      ? 'text-amber-300'
-      : dataSource === 'sample'
-        ? 'text-amber-400'
-        : 'text-zinc-500';
-
-  const dotColor = isLive ? 'bg-emerald-500' : isStale ? 'bg-amber-300' : 'bg-amber-500';
-  const ringColor = isLive ? 'bg-emerald-400' : isStale ? 'bg-amber-200' : 'bg-amber-400';
-
+export default function Header({ eventCount, dataSource, fetchedAt, sources }: Props) {
   return (
     <header className="flex items-center justify-between border-b border-zinc-800 bg-[#0a0a0a] px-5 py-3">
       <div className="flex items-center gap-3">
@@ -47,18 +36,31 @@ export default function Header({ eventCount, dataSource, fetchedAt }: Props) {
       <div className="flex items-center gap-4 text-xs text-zinc-400">
         <Clock />
         <div className="hidden h-4 w-px bg-zinc-800 md:block" />
+        {sources.length > 0 && (
+          <div className="hidden items-center gap-3 md:flex">
+            {sources.map((s) => (
+              <SourceDot key={s.name} s={s} />
+            ))}
+          </div>
+        )}
+        <div className="hidden h-4 w-px bg-zinc-800 md:block" />
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span
-              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${ringColor}`}
+              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
+                dataSource === 'live' ? 'bg-emerald-400' : 'bg-amber-400'
+              }`}
             />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${dotColor}`} />
+            <span
+              className={`relative inline-flex h-2 w-2 rounded-full ${
+                dataSource === 'live' ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}
+            />
           </span>
           <span>
-            LIVE · <span className="text-zinc-200">{eventCount}</span> events
+            <span className="text-zinc-200">{eventCount}</span> events
           </span>
         </div>
-        <div className={`hidden md:block ${sourceTone}`}>{sourceLabel}</div>
       </div>
     </header>
   );

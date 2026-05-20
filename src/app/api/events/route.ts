@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getEvents } from '@/lib/gdelt';
+import { getAllSources } from '@/lib/sources';
 import { SAMPLE_EVENTS } from '@/lib/sample-events';
 
 export const dynamic = 'force-dynamic';
@@ -7,23 +7,25 @@ export const maxDuration = 25;
 
 export async function GET() {
   try {
-    const { events, fromCache, error } = await getEvents();
-    if (events.length === 0) {
+    const { events, markets, sources, fetchedAt } = await getAllSources();
+    const anyOk = sources.some((s) => s.ok && s.count > 0);
+    if (!anyOk) {
       return NextResponse.json(
-        { events: SAMPLE_EVENTS, source: 'sample', reason: 'gdelt returned 0 events' },
+        {
+          events: SAMPLE_EVENTS,
+          markets: [],
+          sources,
+          source: 'sample',
+          fetchedAt,
+        },
         { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
       );
     }
     return NextResponse.json(
-      {
-        events,
-        source: fromCache === 'stale' ? 'gdelt-stale' : 'gdelt',
-        fetchedAt: new Date().toISOString(),
-        ...(error ? { warning: error } : {}),
-      },
+      { events, markets, sources, source: 'live', fetchedAt },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900',
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
         },
       },
     );
@@ -32,9 +34,11 @@ export async function GET() {
     return NextResponse.json(
       {
         events: SAMPLE_EVENTS,
+        markets: [],
+        sources: [],
         source: 'sample',
-        reason: 'fetch failed',
         error: err instanceof Error ? err.message : String(err),
+        fetchedAt: new Date().toISOString(),
       },
       { headers: { 'Cache-Control': 'public, s-maxage=30' } },
     );

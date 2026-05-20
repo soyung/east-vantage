@@ -1,13 +1,18 @@
-import type { EventCategory, EventSeverity, IntelEvent } from './types';
-import { geocode, jitter } from './geocode';
+import type { EventCategory, EventSeverity, IntelEvent } from '../types';
+import { geocode, jitter } from '../geocode';
 
 const GDELT_DOC = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
-// Single combined query covering Taiwan + Korea, kept under GDELT's ~250-char
-// query length limit. One query means one HTTP request — avoids the
-// "1 req per 5s" rate limit and keeps us inside Vercel's function timeout.
+// Tighter query — every clause includes at least one kinetic anchor so we
+// don't pull generic op-eds. ~210 chars (under GDELT's 250 limit).
 const QUERY =
-  '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR "korean peninsula" OR senkaku) (military OR missile OR launch OR aircraft OR navy OR sanction)';
+  '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR senkaku) (missile OR launch OR sortie OR scramble OR incursion OR drill OR exercise OR "median line" OR breach)';
+
+// Title must contain at least one of these tokens or we drop the article.
+// This catches the common case where a vague op-ed mentions the region +
+// "exercise" / "military" but isn't actually about an incident.
+const TITLE_KEYWORD_RX =
+  /(missile|launch|aircraft|sortie|scramble|incursion|drill|exercise|breach|crossed|fire|test|naval|vessel|warship|carrier|adiz|median line|warning)/i;
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -16,7 +21,7 @@ interface GdeltArticle {
   url: string;
   url_mobile?: string;
   title: string;
-  seendate: string; // YYYYMMDDTHHMMSSZ
+  seendate: string;
   socialimage?: string;
   domain?: string;
   language?: string;
@@ -29,25 +34,24 @@ interface GdeltDocResponse {
 
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
   [/missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic/i, 'missile'],
-  [/aircraft|fighter|adiz|j-?\d+|jet|airspace|airfield|sortie|incursion|scramble/i, 'air'],
+  [/aircraft|fighter|adiz|j-?\d+|jet|airspace|airfield|sortie|incursion|scramble|crossed median/i, 'air'],
   [/navy|naval|carrier|warship|coast guard|frigate|destroyer|submarine|vessel|ship|fleet/i, 'naval'],
   [/cyber|hack|apt|intrusion|malware|breach|phishing/i, 'cyber'],
-  [/satellite|imagery|firms|thermal|reactor|enrichment/i, 'satellite'],
-  [/sanction|tariff|export control|trade|economic|semiconductor|chip/i, 'economic'],
-  [/summit|meeting|talks|diplomatic|ambassador|envoy|treaty|joint statement/i, 'diplomatic'],
+  [/satellite|imagery|firms|thermal|reactor|enrichment|fuel rod/i, 'satellite'],
 ];
 
-function classifyCategory(text: string): EventCategory {
+// Returns null when no specific kinetic category matches — we deliberately
+// drop those (previously they were silently bucketed as "diplomatic").
+function classifyCategory(text: string): EventCategory | null {
   for (const [rx, cat] of CATEGORY_RULES) if (rx.test(text)) return cat;
-  return 'diplomatic';
+  return null;
 }
 
 function classifySeverity(text: string): EventSeverity {
   if (/\b(icbm|nuclear test|war|invasion|attack|killed)\b/i.test(text)) return 'critical';
-  if (/\b(launch|missile|incursion|scramble|breach|sanction)\b/i.test(text)) return 'high';
-  if (/\b(exercise|drill|patrol|protest|warning)\b/i.test(text)) return 'medium';
-  if (/\b(meeting|statement|comment|remark)\b/i.test(text)) return 'low';
-  return 'info';
+  if (/\b(launch|missile|incursion|scramble|breach)\b/i.test(text)) return 'high';
+  if (/\b(exercise|drill|patrol|sortie|warning|crossed)\b/i.test(text)) return 'medium';
+  return 'low';
 }
 
 function parseGdeltDate(s: string): string {
@@ -67,18 +71,26 @@ function dedupeKey(a: GdeltArticle): string {
 function articlesToEvents(articles: GdeltArticle[]): IntelEvent[] {
   const seen = new Set<string>();
   const events: IntelEvent[] = [];
+
   for (const a of articles) {
+    if (!TITLE_KEYWORD_RX.test(a.title)) continue;
+    const category = classifyCategory(a.title);
+    if (!category) continue;
+
     const key = dedupeKey(a);
     if (seen.has(key)) continue;
     seen.add(key);
+
     const hit = geocode(a.title, a.sourcecountry);
     if (!hit) continue;
+
     const { lat, lon } = jitter(hit.lat, hit.lon, a.url);
+
     events.push({
       id: `gdelt-${key}`,
       title: a.title.trim(),
       summary: `${a.domain ?? 'unknown source'} · ${a.sourcecountry ?? '?'}${a.language ? ` · ${a.language}` : ''}`,
-      category: classifyCategory(a.title),
+      category,
       severity: classifySeverity(a.title),
       region: hit.region,
       lat,
@@ -101,7 +113,7 @@ async function fetchArticles(): Promise<GdeltArticle[]> {
   url.searchParams.set('sort', 'datedesc');
 
   const res = await fetch(url.toString(), {
-    headers: { 'User-Agent': 'east-vantage/0.1 (research)' },
+    headers: { 'User-Agent': 'east-vantage/0.2 (research)' },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) {
@@ -117,9 +129,6 @@ async function fetchArticles(): Promise<GdeltArticle[]> {
   }
 }
 
-// In-memory cache that survives within a warm serverless container.
-// Concurrent invocations to the same container share it, so we don't hammer
-// GDELT. Different containers will each fetch once.
 interface CacheEntry {
   events: IntelEvent[];
   at: number;
@@ -127,22 +136,13 @@ interface CacheEntry {
 let cache: CacheEntry | null = null;
 let inflight: Promise<IntelEvent[]> | null = null;
 
-export interface FetchResult {
-  events: IntelEvent[];
-  fromCache: 'fresh' | 'stale' | 'none';
-  error?: string;
-}
-
-export async function getEvents(): Promise<FetchResult> {
+export async function getGdeltEvents(): Promise<IntelEvent[]> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_TTL_MS) {
-    return { events: cache.events, fromCache: 'fresh' };
-  }
+  if (cache && now - cache.at < CACHE_TTL_MS) return cache.events;
 
-  // Coalesce concurrent callers in the same container.
   if (!inflight) {
     inflight = fetchArticles()
-      .then((articles) => articlesToEvents(articles))
+      .then(articlesToEvents)
       .finally(() => {
         inflight = null;
       });
@@ -150,16 +150,10 @@ export async function getEvents(): Promise<FetchResult> {
 
   try {
     const events = await inflight;
-    if (events.length > 0) {
-      cache = { events, at: now };
-    }
-    return { events, fromCache: 'none' };
+    cache = { events, at: now };
+    return events;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (cache) {
-      // Stale-while-error: better to show old GDELT data than sample.
-      return { events: cache.events, fromCache: 'stale', error: message };
-    }
+    if (cache) return cache.events; // stale-while-error
     throw err;
   }
 }
