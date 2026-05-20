@@ -6,6 +6,7 @@ import { getUsgsEvents } from './usgs';
 import { getPolymarketMarkets } from './polymarket';
 import { getMndEvents } from './mnd';
 import { getRedditEvents } from './reddit';
+import { getWireEvents } from './wires';
 
 export interface MergedResult {
   events: IntelEvent[];
@@ -42,13 +43,14 @@ async function timed<T>(
 }
 
 export async function getAllSources(): Promise<MergedResult> {
-  const [gdelt, firms, adsb, usgs, mnd, reddit, poly] = await Promise.all([
+  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, poly] = await Promise.all([
     timed('GDELT', getGdeltEvents, [] as IntelEvent[]),
     timed('FIRMS', getFirmsEvents, [] as IntelEvent[]),
     timed('ADSB', getAdsbEvents, [] as IntelEvent[]),
     timed('USGS', getUsgsEvents, [] as IntelEvent[]),
     timed('MND', getMndEvents, [] as IntelEvent[]),
     timed('RDDT', getRedditEvents, [] as IntelEvent[]),
+    timed('WIRE', getWireEvents, [] as IntelEvent[]),
     timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
   ]);
 
@@ -59,6 +61,7 @@ export async function getAllSources(): Promise<MergedResult> {
     ...usgs.value,
     ...mnd.value,
     ...reddit.value,
+    ...wires.value,
   ];
   allEvents.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
 
@@ -72,6 +75,7 @@ export async function getAllSources(): Promise<MergedResult> {
       usgs.status,
       mnd.status,
       reddit.status,
+      wires.status,
       poly.status,
     ],
     fetchedAt: new Date().toISOString(),
