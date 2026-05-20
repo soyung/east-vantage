@@ -1,71 +1,108 @@
 # East Vantage
 
 East Asia–focused OSINT intelligence dashboard. A research-grade demo modeled
-on [DeltaSweep](https://www.deltasweep.com/), narrowed to the Taiwan Strait and
-Korean peninsula.
+on [DeltaSweep](https://www.deltasweep.com/), narrowed to the Taiwan Strait
+and Korean peninsula.
 
-> **Status:** Phase 0 — static scaffold with sample data. Live data pipelines
-> are in the roadmap. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** 8 live sources + LLM classifier. See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)
+> for the as-built source catalog and [docs/ROADMAP.md](docs/ROADMAP.md) for what's next.
+
+## Live data sources
+
+| Pillar | Source | Status |
+|---|---|---|
+| Aircraft (sensor) | adsb.lol `/v2/mil` (military aircraft) | live |
+| Naval / govt | Taiwan MND daily PLA activity report | live |
+| Satellite (sensor) | NASA FIRMS thermal anomalies | live (needs `NASA_FIRMS_MAP_KEY`) |
+| Seismic (sensor) | USGS Earthquake + Punggye-ri geofence | live |
+| News (geocoded) | GDELT 2.0 DOC API with CJK keyword filter | live (frequently rate-limited) |
+| Wire (multilingual) | Yonhap (EN+KR), NHK (JP), Japan Times, 38 North, SCMP | live |
+| Social | Reddit (6 subs) via RSS | live |
+| Social | Telegram public channels (4) via t.me/s/ | live |
+| Prediction | Polymarket Gamma API (sidebar panel) | live |
+| LLM classifier | Claude Haiku 4.5 gating free-text sources | active when `ANTHROPIC_API_KEY` set |
 
 ## Stack
 
 - **Next.js 16** (App Router, Turbopack) + TypeScript + Tailwind v4
-- **Cesium** 3D globe via [Resium](https://github.com/reearth/resium)
-- (planned) **Supabase** Postgres + PostGIS for event storage
-- (planned) **Anthropic Claude** for event classification
+- **Cesium** 3D globe loaded as `<script>` (not bundled — avoids strict-mode incompatibility)
+- **Anthropic SDK** for LLM classifier
+- **undici** for low-level dispatcher control on GDELT calls
+- Deployed on **Vercel** (function region `iad1` to be close to GDELT origin)
 
 ## Quick start
 
 ```bash
 npm install        # installs deps + copies Cesium assets to public/cesium
-cp .env.local.example .env.local   # fill in tokens (Cesium Ion recommended)
+cp .env.local.example .env.local   # fill in tokens
 npm run dev        # http://localhost:3000
 ```
 
-Without a Cesium Ion token the globe still loads but uses a public rate-limited
-token. Get a free one at [ion.cesium.com/tokens](https://ion.cesium.com/tokens)
-and put it in `.env.local` as `NEXT_PUBLIC_CESIUM_ION_TOKEN`.
+Env vars (`.env.local`):
+- `NEXT_PUBLIC_CESIUM_ION_TOKEN` — free at ion.cesium.com/tokens. Recommended.
+- `NASA_FIRMS_MAP_KEY` — free, instant email signup at firms.modaps.eosdis.nasa.gov/api/area/
+- `ANTHROPIC_API_KEY` — for the LLM classifier gate. Optional but recommended.
 
 ## Project layout
 
 ```
 src/
   app/
-    layout.tsx     # root layout
-    page.tsx       # dashboard (client component)
+    layout.tsx
+    page.tsx               # dashboard shell (client)
+    api/events/route.ts    # /api/events — merges all sources
     globals.css
   components/
-    Globe.tsx          # dynamic client wrapper for CesiumGlobe
-    CesiumGlobe.tsx    # Resium/Cesium viewer with entities + ADIZ polygons
-    Header.tsx
-    FilterChips.tsx
-    EventCard.tsx
-    EventFeed.tsx
+    Globe.tsx              # dynamic wrapper for CesiumGlobe (ssr:false)
+    CesiumGlobe.tsx        # script-tag-loaded Cesium viewer
+    Header.tsx + Clock.tsx # brand, viewer-local clock, source health dots
+    FilterChips.tsx        # single-select region + category filters with counts
+    SeverityLegend.tsx     # color key for severity dots
+    EventFeed.tsx + EventCard.tsx
+    MarketPanel.tsx        # Polymarket card stack
+    SplitHandle.tsx        # mobile drag handle between globe and sidebar
   lib/
-    types.ts           # IntelEvent, AdizZone, enums
-    sample-events.ts   # hard-coded sample events (Phase 0)
-    zones.ts           # Taiwan ADIZ, KADIZ, Median Line polygons (rough)
-    format.ts          # severity colors, time-ago, category labels
+    types.ts               # IntelEvent, MarketCard, SourceStatus, enums
+    geocode.ts             # keyword → coords mapper
+    format.ts              # color/label maps
+    zones.ts               # ADIZ polygons (data preserved, rendering disabled)
+    sources/
+      index.ts             # getAllSources(): Promise.all + classifier wiring
+      _classifier.ts       # Claude Haiku classifier (free-text gate)
+      firms.ts             # NASA FIRMS
+      adsb.ts              # adsb.lol /v2/mil
+      usgs.ts              # USGS Earthquake
+      mnd.ts               # Taiwan MND scraper
+      gdelt.ts             # GDELT 2.0 (undici dispatcher, CJK filter)
+      reddit.ts            # Reddit RSS
+      wires.ts             # multilingual wire RSS
+      telegram.ts          # t.me/s/ scraper
+      polymarket.ts        # Gamma API
 scripts/
-  copy-cesium-assets.mjs   # runs postinstall to copy Cesium static files
-public/
-  cesium/                  # Cesium static assets (gitignored; regenerated)
+  copy-cesium-assets.mjs   # postinstall — copies Cesium static files
+  eval-classifier.mjs      # `npm run eval-classifier` — precision/recall harness
+evals/
+  classifier-set.jsonl     # 40 hand-labeled items for classifier eval
+public/cesium/             # gitignored; regenerated by postinstall
 docs/
-  DATA_SOURCES.md          # catalog of free OSINT feeds for East Asia
+  DATA_SOURCES.md          # as-built source catalog
   ROADMAP.md               # phased build plan
 ```
 
-## Notes
+## Architecture notes
 
-- The ADIZ polygons in `src/lib/zones.ts` are rough simplifications for
-  visualization. Replace with authoritative GeoJSON before treating as
-  analytically valid.
-- Sample events are illustrative, not real-time. Replace via Phase 1 data
-  pipelines.
-- `public/cesium/` is generated by the postinstall hook. It should be in
-  `.gitignore` (large, regenerable).
+- **Source isolation**: each source has its own cache + inflight coalescer
+  + graceful failure. One source's outage never blocks the others.
+- **Trusted vs free-text split**: sensor-grade sources (FIRMS, ADSB, USGS,
+  MND) bypass the LLM classifier; news/social/wire pass through it.
+- **Classifier is fail-open**: when `ANTHROPIC_API_KEY` is missing or the
+  call fails, items pass through with an `unverified` tag. No silent
+  data loss.
+- **Mobile-first layout**: drag handle between globe and feed; feed-side
+  scroll is independent on desktop, combined with sidebar on mobile.
 
 ## License
 
-TBD. Sample data and ADIZ polygons are author-created; OSINT source data
-remains the property of its respective providers.
+TBD. Original code MIT-style for the dashboard; OSINT source data
+remains the property of its respective providers (each event links back
+to its original source URL).
