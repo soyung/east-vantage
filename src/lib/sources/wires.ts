@@ -31,11 +31,19 @@ const REGION_RX =
   /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|hsinchu|north korea|dprk|kim jong|pyongyang|yongbyon|sohae|punggye|korean peninsula|south korea|seoul|jeju|ieodo|japan|japanese|jsdf|jasdf|jmsdf|yokota|kadena|misawa|iwakuni|sasebo|yokosuka|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|guangzhou|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|発射|戦闘機|領空|自衛隊)/i;
 
 const KINETIC_RX =
-  /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|sanction|test|nuclear|reactor|provocation|airspace|naval|warning|patrol|飛彈|导弹|发射|戰機|战机|軍機|军机|演習|演习|미사일|발사|훈련|침범|ミサイル|発射|戦闘機|演習)/i;
+  /(missile|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|sanction|nuclear test|reactor|provocation|airspace|naval|warning|patrol|飛彈|导弹|发射|戰機|战机|軍機|军机|演習|演习|미사일|훈련|침범|ミサイル|戦闘機|演習)/i;
+
+// Diplomatic/business contexts that produce false positives even when
+// they contain words like 'launch' or 'test'. Drop if title matches.
+const NEGATIVE_RX =
+  /(working group|diplomat|envoy|summit|talks|meeting|cooperation|partnership|trade deal|economic|cultural|initiative|launches? (?:working|group|partnership|initiative|talks|meeting|investigation))/i;
 
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
+  // Note: bare 'launch' removed — too many diplomatic false positives
+  // ("launch working groups", "launch initiative"). Real launches use
+  // 'missile launch', 'icbm', 'srbm', etc.
   [
-    /missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic|飛彈|导弹|미사일|발사|ミサイル|発射/i,
+    /missile|projectile|icbm|srbm|cruise missile|hwasong|ballistic|飛彈|导弹|미사일|발사|ミサイル|発射|launch(?:\s+(?:vehicle|pad|test|complex|of (?:a |the )?(?:missile|icbm|srbm|rocket|satellite)))/i,
     'missile',
   ],
   [
@@ -124,12 +132,23 @@ async function fetchFeed(feed: FeedSpec): Promise<IntelEvent[]> {
   const xml = await res.text();
   const items = parseRss(xml);
 
+  // Dedupe Yonhap-style revisions: "(LEAD) X" and "X" point to the same story
+  const dedupeSeen = new Set<string>();
   const out: IntelEvent[] = [];
   for (const it of items) {
+    if (NEGATIVE_RX.test(it.title)) continue;
     if (!REGION_RX.test(it.title)) continue;
     if (!KINETIC_RX.test(it.title)) continue;
     const category = classifyCategory(it.title);
     if (!category) continue;
+
+    const normalized = it.title
+      .replace(/^\((?:[0-9]+(?:st|nd|rd|th)?\s+)?(?:LEAD|LD|UPDATE)\)\s*/i, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (dedupeSeen.has(normalized)) continue;
+    dedupeSeen.add(normalized);
 
     const hit = geocode(it.title);
     if (!hit) continue;

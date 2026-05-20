@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { IntelEvent } from '@/lib/types';
-import { BASES, OPERATOR_COLOR, emojiFor } from '@/lib/military-bases';
+import { BASES, OPERATOR_COLOR } from '@/lib/military-bases';
+
+// All bases get a single non-emoji glyph so they read as "fixed
+// installations" and don't visually collide with event emojis
+// (✈ ⚓ 🚀 💻) which mean "active occurrence."
+const BASE_GLYPH = '★';
 
 // We deliberately do NOT `import 'cesium'`. The npm package's source modules
 // contain syntax that some modern bundlers re-emit in a way that breaks under
@@ -82,6 +87,7 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
   const CesiumRef = useRef<CesiumNS | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const cleanupRef = useRef<(() => void) | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -128,19 +134,22 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
         // looked like crude rectangles. When real GeoJSON boundaries land,
         // re-enable by iterating ZONES (kept in src/lib/zones.ts).
 
-        // Military bases — static background layer. Drawn ONCE (not in the
-        // events-sync effect that calls removeAll) so they always stay put.
+        // Military bases — static background layer, drawn once. Keep a
+        // lookup so the hover tooltip can show meaningful info.
+        const baseById = new Map<string, (typeof BASES)[number]>();
         for (const b of BASES) {
+          const id = `base-${b.id}`;
+          baseById.set(id, b);
           viewer.entities.add({
-            id: `base-${b.id}`,
+            id,
             name: b.name,
             position: Cesium.Cartesian3.fromDegrees(b.lon, b.lat),
             label: {
-              text: emojiFor(b.kind),
-              font: '15px sans-serif',
+              text: BASE_GLYPH,
+              font: 'bold 14px sans-serif',
               fillColor: Cesium.Color.fromCssColorString(OPERATOR_COLOR[b.operator]),
               outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
+              outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               showBackground: false,
               translucencyByDistance: new Cesium.NearFarScalar(
@@ -148,11 +157,50 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
                 15_000_000, 0.25,
               ),
             },
-            description: `<div style="color:${OPERATOR_COLOR[b.operator]};font-weight:600">${b.operator}</div><div>${b.name}</div><div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.05em">${b.kind}</div>`,
           });
         }
 
+        // Custom hover tooltip — Cesium's built-in infoBox needs a click.
+        // We render a tiny absolutely-positioned div next to the cursor on
+        // mouseover. Works for bases (shows base name + operator) and for
+        // events (shows event title).
+        const tip = document.createElement('div');
+        tip.style.cssText =
+          'position:fixed;z-index:9999;pointer-events:none;display:none;' +
+          'background:#0a0a0acc;color:#fafafa;padding:6px 10px;border-radius:4px;' +
+          'border:1px solid #27272a;font:12px ui-sans-serif,system-ui,sans-serif;' +
+          'max-width:240px;line-height:1.35;box-shadow:0 4px 12px #0008';
+        document.body.appendChild(tip);
+
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        handler.setInputAction(
+          (move: { endPosition: { x: number; y: number } }) => {
+            const picked = viewer.scene.pick(move.endPosition as never);
+            if (picked && picked.id && typeof picked.id.id === 'string') {
+              const id = picked.id.id as string;
+              if (id.startsWith('base-')) {
+                const b = baseById.get(id);
+                if (b) {
+                  tip.innerHTML = `<div style="color:${OPERATOR_COLOR[b.operator]};font-weight:600;font-size:10px;letter-spacing:.08em">${b.operator}</div><div style="margin-top:2px">${b.name}</div><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.05em;margin-top:1px">${b.kind}</div>`;
+                  tip.style.display = 'block';
+                }
+              } else {
+                // Event hover — find current event for name
+                const ent = viewer.entities.getById(id);
+                const name = (ent?.name as string) || (ent?.id as string) || id;
+                tip.innerHTML = `<div>${name}</div>`;
+                tip.style.display = 'block';
+              }
+              // Position next to cursor; use canvas-relative coords + offset
+              const rect = viewer.scene.canvas.getBoundingClientRect();
+              tip.style.left = `${rect.left + move.endPosition.x + 14}px`;
+              tip.style.top = `${rect.top + move.endPosition.y + 14}px`;
+            } else {
+              tip.style.display = 'none';
+            }
+          },
+          Cesium.ScreenSpaceEventType.MOUSE_MOVE,
+        );
         handler.setInputAction((click: { position: { x: number; y: number } }) => {
           const picked = viewer.scene.pick(click.position as never);
           if (picked && picked.id && typeof picked.id.id === 'string') {
@@ -164,6 +212,11 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
           }
           onSelectRef.current(null);
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        // Stash for cleanup
+        cleanupRef.current = () => {
+          try { handler.destroy(); } catch {}
+          try { tip.remove(); } catch {}
+        };
 
         viewerRef.current = viewer;
         setReady(true);
