@@ -9,7 +9,9 @@ interface Props {
 }
 
 function SourceDot({ s }: { s: SourceStatus }) {
-  const color = !s.ok ? 'bg-red-500' : s.count === 0 ? 'bg-amber-500' : 'bg-emerald-500';
+  // green: working with data, grey: working but quiet (no current data),
+  // red: actually broken. Amber is reserved for stale/degraded states.
+  const color = !s.ok ? 'bg-red-500' : s.count === 0 ? 'bg-zinc-500' : 'bg-emerald-500';
   const title = `${s.name}: ${s.ok ? `${s.count} items` : (s.error ?? 'failed')} · ${s.durationMs}ms`;
   return (
     <div className="flex items-center gap-1" title={title}>

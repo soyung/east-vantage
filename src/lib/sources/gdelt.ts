@@ -19,11 +19,28 @@ const gdeltDispatcher = new Agent({
 const QUERY =
   '("taiwan strait" OR "pla aircraft" OR "north korea" OR pyongyang OR yongbyon OR senkaku) (missile OR launch OR sortie OR scramble OR incursion OR drill OR exercise OR "median line" OR breach)';
 
-// Title must contain at least one of these tokens or we drop the article.
-// This catches the common case where a vague op-ed mentions the region +
-// "exercise" / "military" but isn't actually about an incident.
-const TITLE_KEYWORD_RX =
-  /(missile|launch|aircraft|sortie|scramble|incursion|drill|exercise|breach|crossed|fire|test|naval|vessel|warship|carrier|adiz|median line|warning)/i;
+// Title must contain at least one kinetic keyword. Includes CJK terms so
+// that Chinese/Japanese/Korean wire coverage (which dominates East Asia
+// reporting) doesn't get silently dropped.
+const TITLE_KEYWORD_RX = new RegExp(
+  [
+    // English
+    'missile', 'launch', 'aircraft', 'sortie', 'scramble', 'incursion', 'drill',
+    'exercise', 'breach', 'crossed', 'fire', 'test', 'naval', 'vessel',
+    'warship', 'carrier', 'adiz', 'median line', 'warning', 'patrol',
+    // Chinese (Traditional + Simplified)
+    '飛彈', '导弹', '飞弹', '發射', '发射', '戰機', '战机', '軍機', '军机',
+    '軍演', '军演', '演習', '演习', '艦', '舰', '航母', '驱逐舰', '驅逐艦',
+    '解放軍', '解放军', '海警', '海軍', '海军', '空軍', '空军', '入侵', '越界',
+    '中線', '中线', '防空識別', '防空识别', '巡邏', '巡逻', '試射', '试射',
+    // Korean
+    '미사일', '발사', '항공기', '함정', '훈련', '도발', '영공', '침범',
+    '핵실험', '발사체', '전투기', '구축함',
+    // Japanese
+    'ミサイル', '発射', '戦闘機', '巡視船', '訓練', '領空', '演習', '艦艇',
+  ].join('|'),
+  'i',
+);
 
 const REQUEST_TIMEOUT_MS = 25_000;
 // Successful response is cached for 15 min — well past GDELT's typical
@@ -50,11 +67,23 @@ interface GdeltDocResponse {
 }
 
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
-  [/missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic/i, 'missile'],
-  [/aircraft|fighter|adiz|j-?\d+|jet|airspace|airfield|sortie|incursion|scramble|crossed median/i, 'air'],
-  [/navy|naval|carrier|warship|coast guard|frigate|destroyer|submarine|vessel|ship|fleet/i, 'naval'],
+  [
+    /missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic|飛彈|导弹|飞弹|미사일|발사|ミサイル|発射|試射|试射/i,
+    'missile',
+  ],
+  [
+    /aircraft|fighter|adiz|j-?\d+|jet|airspace|airfield|sortie|incursion|scramble|crossed median|戰機|战机|軍機|军机|空軍|空军|防空|항공기|영공|전투기|戦闘機|領空|中線|中线/i,
+    'air',
+  ],
+  [
+    /navy|naval|carrier|warship|coast guard|frigate|destroyer|submarine|vessel|ship|fleet|艦|舰|海軍|海军|海警|航母|驱逐舰|驅逐艦|함정|구축함|巡視船|艦艇/i,
+    'naval',
+  ],
   [/cyber|hack|apt|intrusion|malware|breach|phishing/i, 'cyber'],
-  [/satellite|imagery|firms|thermal|reactor|enrichment|fuel rod/i, 'satellite'],
+  [
+    /satellite|imagery|firms|thermal|reactor|enrichment|fuel rod|衛星|卫星|위성|衛星画像/i,
+    'satellite',
+  ],
 ];
 
 // Returns null when no specific kinetic category matches — we deliberately
