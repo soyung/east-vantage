@@ -43,13 +43,19 @@ const TITLE_KEYWORD_RX = new RegExp(
 );
 
 const REQUEST_TIMEOUT_MS = 25_000;
-// Successful response is cached for 15 min — well past GDELT's typical
-// edge-of-rate-limit recovery window and few enough hits/hour that the
-// shared iad1 egress IPs stay clean.
 const CACHE_TTL_MS = 15 * 60 * 1000;
-// After any failure (429, timeout, etc.) wait this long before trying
-// again. Stops us hammering GDELT and earning more 429s.
+// After a non-rate-limit error (timeout, parse, etc.) wait 2 min.
 const FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
+// 429 is a normal occurrence on shared egress IPs — wait shorter and don't
+// bubble up as a hard error.
+const RATELIMIT_COOLDOWN_MS = 90 * 1000;
+
+class GdeltRateLimitError extends Error {
+  constructor() {
+    super('rate-limited');
+    this.name = 'GdeltRateLimitError';
+  }
+}
 
 interface GdeltArticle {
   url: string;
@@ -163,11 +169,20 @@ async function fetchArticles(): Promise<GdeltArticle[]> {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     dispatcher: gdeltDispatcher,
   });
+  // GDELT sometimes returns 429 in body but 200 in status; check both.
+  if (res.status === 429) {
+    throw new GdeltRateLimitError();
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`GDELT ${res.status}: ${body.slice(0, 200)}`);
   }
   const text = await res.text();
+  // Sometimes GDELT replies 200 with a plain-text "Please limit requests..."
+  // body instead of JSON. Detect and treat as 429.
+  if (/limit requests to one every/i.test(text)) {
+    throw new GdeltRateLimitError();
+  }
   try {
     const data = JSON.parse(text) as GdeltDocResponse;
     return data.articles ?? [];
@@ -206,6 +221,12 @@ export async function getGdeltEvents(): Promise<IntelEvent[]> {
     cache = { events, at: now };
     return events;
   } catch (err) {
+    if (err instanceof GdeltRateLimitError) {
+      // Rate limit isn't a real failure of our system. Cool down briefly
+      // and report an empty result (grey dot, not red).
+      nextAttemptAfter = now + RATELIMIT_COOLDOWN_MS;
+      return cache?.events ?? [];
+    }
     nextAttemptAfter = now + FAILURE_COOLDOWN_MS;
     if (cache) return cache.events;
     throw err;
