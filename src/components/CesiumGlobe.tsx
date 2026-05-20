@@ -317,6 +317,27 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
       }
 
       viewer.entities.add(base);
+
+      // Trailing polyline for moving entities (aircraft now; later ships).
+      // The track is a list of [lon, lat] pairs oldest → newest; we draw
+      // a faded line so the path is visible behind the current position.
+      if (evt.track && evt.track.length > 1) {
+        const trailId = `${evt.id}-trail`;
+        prevEventIdsRef.current.add(trailId);
+        const flat: number[] = [];
+        for (const [lo, la] of evt.track) {
+          flat.push(lo, la);
+        }
+        viewer.entities.add({
+          id: trailId,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray(flat),
+            width: isSel ? 2.5 : 1.5,
+            material: color.withAlpha(isSel ? 0.85 : 0.55),
+            clampToGround: false,
+          },
+        });
+      }
     }
   }, [events, selectedId, ready]);
 

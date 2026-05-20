@@ -30,6 +30,14 @@ export interface IntelEvent {
   source: string;
   sourceUrl?: string;
   tags?: string[];
+  // Movement metadata (mostly ADSB). Track is a sequence of [lon, lat]
+  // points from oldest → newest including the current position; the
+  // globe draws a fading polyline between them so aircraft trajectories
+  // are visible at a glance.
+  track?: Array<[number, number]>;
+  headingDeg?: number;
+  altitudeFt?: number;
+  speedKt?: number;
 }
 
 export interface AdizZone {

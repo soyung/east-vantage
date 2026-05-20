@@ -63,7 +63,10 @@ export default function Home() {
     }
 
     load();
-    const id = setInterval(load, 5 * 60 * 1000);
+    // 90s refresh keeps the ADSB trails feeling live without hammering
+    // the API route. Heavier sources cache further on the server side
+    // so this doesn't multiply upstream cost.
+    const id = setInterval(load, 90 * 1000);
     return () => {
       cancelled = true;
       clearInterval(id);
