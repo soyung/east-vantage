@@ -33,11 +33,18 @@ export default function Clock() {
   const time = `${get('hour')}:${get('minute')}:${get('second')}`;
   const tz = get('timeZoneName');
 
+  // Mobile shows time + tz only (date hidden to save horizontal space).
+  // Seconds also hidden on mobile to reduce visual jitter.
+  const mobileTime = `${get('hour')}:${get('minute')}`;
+
   return (
-    <div className="flex items-center gap-2 font-mono text-[11px] tabular-nums">
-      <span className="text-zinc-400">{date}</span>
-      <span className="text-zinc-100">{time}</span>
-      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{tz}</span>
+    <div className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums md:gap-2">
+      <span className="hidden text-zinc-400 md:inline">{date}</span>
+      <span className="text-zinc-100 md:hidden">{mobileTime}</span>
+      <span className="hidden text-zinc-100 md:inline">{time}</span>
+      <span className="rounded bg-zinc-800 px-1 py-0.5 text-[9px] text-zinc-400 md:px-1.5 md:text-[10px]">
+        {tz}
+      </span>
     </div>
   );
 }

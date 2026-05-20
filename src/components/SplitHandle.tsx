@@ -18,7 +18,7 @@ export default function SplitHandle({ mainPct, setMainPct, headerOffset = 56 }: 
       role="separator"
       aria-orientation="horizontal"
       aria-label="Resize map and feed"
-      className="relative z-10 flex h-10 w-full cursor-row-resize touch-none select-none items-center justify-center border-y border-zinc-800 bg-zinc-900 active:bg-zinc-800 md:hidden"
+      className="relative z-10 flex h-6 w-full cursor-row-resize touch-none select-none items-center justify-center border-y border-zinc-800/60 bg-zinc-900/70 active:bg-zinc-800 md:hidden"
       onPointerDown={(e) => {
         dragging.current = true;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -45,11 +45,9 @@ export default function SplitHandle({ mainPct, setMainPct, headerOffset = 56 }: 
       onDoubleClick={() => setMainPct(45)}
     >
       {/* pointer-events: none so the handle div, not this grip, is always
-          e.currentTarget for pointer capture */}
-      <div className="pointer-events-none flex flex-col items-center gap-0.5">
-        <div className="h-1 w-12 rounded-full bg-zinc-500" />
-        <div className="h-1 w-12 rounded-full bg-zinc-500" />
-      </div>
+          e.currentTarget for pointer capture. Hit zone is the full 24px
+          row; the visible grip is just affordance. */}
+      <div className="pointer-events-none h-0.5 w-10 rounded-full bg-zinc-500" />
     </div>
   );
 }

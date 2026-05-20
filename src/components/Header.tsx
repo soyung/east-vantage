@@ -16,37 +16,42 @@ function SourceDot({ s }: { s: SourceStatus }) {
   return (
     <div className="flex items-center gap-1" title={title}>
       <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
-      <span className="text-[10px] font-medium tracking-wide text-zinc-400">{s.name}</span>
+      {/* Label hidden on mobile to fit; tooltip still works via title */}
+      <span className="hidden text-[10px] font-medium tracking-wide text-zinc-400 md:inline">
+        {s.name}
+      </span>
     </div>
   );
 }
 
 export default function Header({ eventCount, dataSource, fetchedAt, sources }: Props) {
   return (
-    <header className="flex items-center justify-between border-b border-zinc-800 bg-[#0a0a0a] px-5 py-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-amber-500 to-red-600 text-xs font-bold text-black">
+    <header className="flex items-center justify-between border-b border-zinc-800 bg-[#0a0a0a] px-4 py-2.5 md:px-5 md:py-3">
+      <div className="flex items-center gap-2.5 md:gap-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-gradient-to-br from-amber-500 to-red-600 text-[10px] font-bold text-black md:h-8 md:w-8 md:text-xs">
           EV
         </div>
         <div>
-          <div className="text-sm font-semibold tracking-tight text-zinc-100">East Vantage</div>
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+          <div className="text-xs font-semibold tracking-tight text-zinc-100 md:text-sm">
+            East Vantage
+          </div>
+          <div className="hidden text-[10px] uppercase tracking-widest text-zinc-500 md:block">
             East Asia OSINT · Taiwan Strait · Korean Peninsula
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-4 text-xs text-zinc-400">
+      <div className="flex items-center gap-2 text-xs text-zinc-400 md:gap-4">
         <Clock />
         <div className="hidden h-4 w-px bg-zinc-800 md:block" />
         {sources.length > 0 && (
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="flex items-center gap-1.5 md:gap-3">
             {sources.map((s) => (
               <SourceDot key={s.name} s={s} />
             ))}
           </div>
         )}
         <div className="hidden h-4 w-px bg-zinc-800 md:block" />
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <span className="relative flex h-2 w-2">
             <span
               className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
