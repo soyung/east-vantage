@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { IntelEvent } from '@/lib/types';
-import { CATEGORY_LABEL, SEVERITY_COLOR, SEVERITY_RING, timeAgo } from '@/lib/format';
+import { CATEGORY_EMOJI, CATEGORY_LABEL, SEVERITY_COLOR, SEVERITY_RING, timeAgo } from '@/lib/format';
 
 interface Props {
   event: IntelEvent;
@@ -58,6 +58,9 @@ export default function EventCard({ event, selected, onSelect }: Props) {
     >
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-zinc-500">
         <span className={`h-1.5 w-1.5 rounded-full ${SEVERITY_COLOR[event.severity]}`} />
+        <span className="text-sm leading-none" aria-hidden="true">
+          {CATEGORY_EMOJI[event.category] ?? '·'}
+        </span>
         <span>{CATEGORY_LABEL[event.category]}</span>
         <span className="text-zinc-700">·</span>
         <span>{timeAgo(event.timestamp)}</span>

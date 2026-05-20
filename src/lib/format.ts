@@ -35,3 +35,17 @@ export const CATEGORY_LABEL: Record<string, string> = {
   diplomatic: 'Diplomatic',
   economic: 'Economic',
 };
+
+// Single-glyph icon per category. Aircraft, ship, etc. — picked for
+// recognizability across platforms (these render as text emoji, not
+// images, so Cesium and the sidebar share them).
+export const CATEGORY_EMOJI: Record<string, string> = {
+  air: '✈',
+  naval: '⚓',
+  missile: '🚀',
+  cyber: '💻',
+  satellite: '🔥',
+  seismic: '⛰',
+  diplomatic: '💬',
+  economic: '💱',
+};
