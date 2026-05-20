@@ -3,7 +3,7 @@ import type { SourceStatus } from '@/lib/types';
 
 interface Props {
   eventCount: number;
-  dataSource: 'loading' | 'live' | 'sample';
+  dataSource: 'loading' | 'live';
   fetchedAt: string | null;
   sources: SourceStatus[];
 }

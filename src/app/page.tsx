@@ -8,7 +8,6 @@ import FilterChips from '@/components/FilterChips';
 import MarketPanel from '@/components/MarketPanel';
 import SeverityLegend from '@/components/SeverityLegend';
 import SplitHandle from '@/components/SplitHandle';
-import { SAMPLE_EVENTS } from '@/lib/sample-events';
 import type {
   EventCategory,
   EventRegion,
@@ -17,19 +16,19 @@ import type {
   SourceStatus,
 } from '@/lib/types';
 
-type DataSource = 'loading' | 'live' | 'sample';
+type DataSource = 'loading' | 'live';
 
 interface EventsResponse {
   events: IntelEvent[];
   markets: MarketCard[];
   sources: SourceStatus[];
-  source: 'live' | 'sample';
+  source: 'live';
   fetchedAt?: string;
   error?: string;
 }
 
 export default function Home() {
-  const [events, setEvents] = useState<IntelEvent[]>(SAMPLE_EVENTS);
+  const [events, setEvents] = useState<IntelEvent[]>([]);
   const [markets, setMarkets] = useState<MarketCard[]>([]);
   const [sources, setSources] = useState<SourceStatus[]>([]);
   const [dataSource, setDataSource] = useState<DataSource>('loading');
@@ -49,15 +48,15 @@ export default function Home() {
         const res = await fetch('/api/events', { cache: 'no-store' });
         const data = (await res.json()) as EventsResponse;
         if (cancelled) return;
-        setEvents(data.events.length > 0 ? data.events : SAMPLE_EVENTS);
+        setEvents(data.events ?? []);
         setMarkets(data.markets ?? []);
         setSources(data.sources ?? []);
-        setDataSource(data.source);
+        setDataSource('live');
         setFetchedAt(data.fetchedAt ?? new Date().toISOString());
       } catch (err) {
         console.error('[page] /api/events fetch failed:', err);
         if (!cancelled) {
-          setDataSource('sample');
+          setDataSource('live');
           setFetchedAt(new Date().toISOString());
         }
       }
@@ -126,7 +125,12 @@ export default function Home() {
             />
             {markets.length > 0 && <MarketPanel markets={markets} />}
             <SeverityLegend />
-            <EventFeed events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+            <EventFeed
+              events={filtered}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              loading={dataSource === 'loading'}
+            />
           </div>
         </aside>
         <main
