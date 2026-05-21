@@ -313,28 +313,34 @@ export default function CesiumGlobe({
         };
       }
 
-      if (isSel) {
-        const title = evt.title.length > 60 ? evt.title.slice(0, 57) + '...' : evt.title;
-        base.label = {
-          ...(base.label as object || {}),
-          // Override text to show the title when selected (emoji items
-          // still show the emoji at larger size by virtue of being the
-          // 'label' graphic). For dot items we add a separate label here.
-          text: emoji ? `${emoji}  ${title}` : title,
-          font: '13px sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, -28),
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('#0a0a0acc'),
-          backgroundPadding: new Cesium.Cartesian2(8, 6),
-        };
-      }
-
       viewer.entities.add(base);
+
+      // Selected events get a SEPARATE popup label entity so the title
+      // pops up above the marker without erasing the icon itself.
+      // (Previously we overwrote the entity's own label, which made
+      // emoji-rendered events disappear on click.)
+      if (isSel) {
+        const popupId = `${evt.id}-popup`;
+        prevEventIdsRef.current.add(popupId);
+        const title = evt.title.length > 60 ? evt.title.slice(0, 57) + '...' : evt.title;
+        viewer.entities.add({
+          id: popupId,
+          position: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat),
+          label: {
+            text: emoji ? `${emoji}  ${title}` : title,
+            font: '13px sans-serif',
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cesium.Cartesian2(0, -36),
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString('#0a0a0acc'),
+            backgroundPadding: new Cesium.Cartesian2(8, 6),
+          },
+        });
+      }
 
       // Trailing polyline for moving entities (aircraft now; later ships).
       // When the user selects an ADSB event AND a full trace has been
