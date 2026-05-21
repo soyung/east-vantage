@@ -364,17 +364,24 @@ export default function CesiumGlobe({
     }
   }, [events, selectedId, ready, aircraftTrace]);
 
-  // Fly camera to the selected event so a click on a tiny dot reveals
-  // where you actually are.
+  // Fly camera to the selected event. We use viewer.flyTo(entity) so
+  // Cesium computes a proper framing (the previous camera.flyTo with
+  // destination only kept the camera's existing orientation, so the
+  // selected icon often ended up behind / below the camera and looked
+  // like it had disappeared).
   useEffect(() => {
     const viewer = viewerRef.current;
     const Cesium = CesiumRef.current;
     if (!viewer || !Cesium || !selectedId) return;
-    const evt = events.find((e) => e.id === selectedId);
-    if (!evt) return;
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat, 900_000),
+    const ent = viewer.entities.getById(selectedId);
+    if (!ent) return;
+    void viewer.flyTo(ent, {
       duration: 1.0,
+      offset: new Cesium.HeadingPitchRange(
+        0,                                  // heading north
+        Cesium.Math.toRadians(-55),         // pitch ~55° down
+        500_000,                            // 500km range — close enough to see scale boost
+      ),
     });
   }, [selectedId, events, ready]);
 

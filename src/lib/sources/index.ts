@@ -3,7 +3,7 @@ import { getGdeltEvents } from './gdelt';
 import { getFirmsEvents } from './firms';
 import { getAdsbEvents } from './adsb';
 import { getUsgsEvents } from './usgs';
-import { getPolymarketMarkets } from './polymarket';
+// import { getPolymarketMarkets } from './polymarket'; // disabled — UI clutter, low signal
 import { getMndEvents } from './mnd';
 import { getRedditEvents } from './reddit';
 import { getWireEvents } from './wires';
@@ -46,7 +46,7 @@ async function timed<T>(
 }
 
 export async function getAllSources(): Promise<MergedResult> {
-  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, telegram, ais, poly] = await Promise.all([
+  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, telegram, ais] = await Promise.all([
     timed('GDELT', getGdeltEvents, [] as IntelEvent[]),
     timed('FIRMS', getFirmsEvents, [] as IntelEvent[]),
     timed('ADSB', getAdsbEvents, [] as IntelEvent[]),
@@ -56,7 +56,7 @@ export async function getAllSources(): Promise<MergedResult> {
     timed('WIRE', getWireEvents, [] as IntelEvent[]),
     timed('TGRM', getTelegramEvents, [] as IntelEvent[]),
     timed('AIS', getAisEvents, [] as IntelEvent[]),
-    timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
+    // timed('POLY', getPolymarketMarkets, [] as MarketCard[]), // disabled
   ]);
 
   // Trusted (structured / sensor) sources skip the LLM classifier.
@@ -73,7 +73,7 @@ export async function getAllSources(): Promise<MergedResult> {
 
   return {
     events: allEvents,
-    markets: poly.value,
+    markets: [] as MarketCard[], // Polymarket disabled — see import above
     sources: [
       gdelt.status,
       firms.status,
@@ -84,7 +84,7 @@ export async function getAllSources(): Promise<MergedResult> {
       wires.status,
       telegram.status,
       ais.status,
-      poly.status,
+      // poly.status, // disabled
     ],
     fetchedAt: new Date().toISOString(),
   };

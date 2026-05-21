@@ -171,7 +171,9 @@ export default function Home() {
               onRegionChange={setActiveRegion}
               onCategoryChange={setActiveCategory}
             />
-            {markets.length > 0 && <MarketPanel markets={markets} />}
+            {/* Polymarket panel disabled — uncomment to re-enable. Server-side
+                also commented out in src/lib/sources/index.ts. */}
+            {/* {markets.length > 0 && <MarketPanel markets={markets} />} */}
             <SeverityLegend />
             <EventFeed
               events={filtered}
