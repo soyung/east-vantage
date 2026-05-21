@@ -8,6 +8,7 @@ import { getMndEvents } from './mnd';
 import { getRedditEvents } from './reddit';
 import { getWireEvents } from './wires';
 import { getTelegramEvents } from './telegram';
+import { getAisEvents } from './ais';
 import { classifyEvents } from './_classifier';
 
 export interface MergedResult {
@@ -45,7 +46,7 @@ async function timed<T>(
 }
 
 export async function getAllSources(): Promise<MergedResult> {
-  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, telegram, poly] = await Promise.all([
+  const [gdelt, firms, adsb, usgs, mnd, reddit, wires, telegram, ais, poly] = await Promise.all([
     timed('GDELT', getGdeltEvents, [] as IntelEvent[]),
     timed('FIRMS', getFirmsEvents, [] as IntelEvent[]),
     timed('ADSB', getAdsbEvents, [] as IntelEvent[]),
@@ -54,13 +55,16 @@ export async function getAllSources(): Promise<MergedResult> {
     timed('RDDT', getRedditEvents, [] as IntelEvent[]),
     timed('WIRE', getWireEvents, [] as IntelEvent[]),
     timed('TGRM', getTelegramEvents, [] as IntelEvent[]),
+    timed('AIS', getAisEvents, [] as IntelEvent[]),
     timed('POLY', getPolymarketMarkets, [] as MarketCard[]),
   ]);
 
   // Trusted (structured / sensor) sources skip the LLM classifier.
   // Free-text sources go through the gate so opinion / commemoration
   // / diplomatic noise gets dropped.
-  const trusted = [...firms.value, ...adsb.value, ...usgs.value, ...mnd.value];
+  const trusted = [
+    ...firms.value, ...adsb.value, ...usgs.value, ...mnd.value, ...ais.value,
+  ];
   const freeText = [...gdelt.value, ...reddit.value, ...wires.value, ...telegram.value];
 
   const classified = await classifyEvents(freeText);
@@ -79,6 +83,7 @@ export async function getAllSources(): Promise<MergedResult> {
       reddit.status,
       wires.status,
       telegram.status,
+      ais.status,
       poly.status,
     ],
     fetchedAt: new Date().toISOString(),
