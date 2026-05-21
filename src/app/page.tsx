@@ -8,6 +8,7 @@ import FilterChips from '@/components/FilterChips';
 import MarketPanel from '@/components/MarketPanel';
 import SeverityLegend from '@/components/SeverityLegend';
 import SplitHandle from '@/components/SplitHandle';
+import TimelineScrubber from '@/components/TimelineScrubber';
 import type {
   EventCategory,
   EventRegion,
@@ -46,13 +47,21 @@ export default function Home() {
     eventId: string;
     points: Array<[number, number]>;
   } | null>(null);
+  // Timeline scrubber: when non-null, /api/events is queried with
+  // ?since=&until= and the response comes from the server's rolling
+  // event-store instead of a fresh fetch.
+  const [timeRange, setTimeRange] = useState<{ since: string; until: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        const res = await fetch('/api/events', { cache: 'no-store' });
+        const path =
+          timeRange === null
+            ? '/api/events'
+            : `/api/events?since=${encodeURIComponent(timeRange.since)}&until=${encodeURIComponent(timeRange.until)}`;
+        const res = await fetch(path, { cache: 'no-store' });
         const data = (await res.json()) as EventsResponse;
         if (cancelled) return;
         setEvents(data.events ?? []);
@@ -70,15 +79,16 @@ export default function Home() {
     }
 
     load();
-    // 90s refresh keeps the ADSB trails feeling live without hammering
-    // the API route. Heavier sources cache further on the server side
-    // so this doesn't multiply upstream cost.
-    const id = setInterval(load, 90 * 1000);
+    // Live mode refreshes every 90 s. Historical mode (scrubber dragged
+    // back) refreshes more slowly because the data underneath doesn't
+    // change in real time.
+    const refreshMs = timeRange === null ? 90 * 1000 : 5 * 60 * 1000;
+    const id = setInterval(load, refreshMs);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [timeRange]);
 
   // When an ADSB event is selected, fetch its full 24h trace from
   // ADSBexchange (via our proxy). Cleared when selection changes away
@@ -172,15 +182,18 @@ export default function Home() {
           </div>
         </aside>
         <main
-          className="relative h-[var(--main-h)] flex-shrink-0 md:h-auto md:flex-1"
+          className="relative flex h-[var(--main-h)] flex-shrink-0 flex-col md:h-auto md:flex-1"
           style={{ '--main-h': `${mobileMainPct}dvh` } as React.CSSProperties}
         >
-          <Globe
-            events={filtered}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            aircraftTrace={aircraftTrace}
-          />
+          <div className="relative min-h-0 flex-1">
+            <Globe
+              events={filtered}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              aircraftTrace={aircraftTrace}
+            />
+          </div>
+          <TimelineScrubber onRangeChange={setTimeRange} />
         </main>
       </div>
     </div>
