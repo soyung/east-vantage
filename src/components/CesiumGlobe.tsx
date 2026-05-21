@@ -152,15 +152,21 @@ export default function CesiumGlobe({
             position: Cesium.Cartesian3.fromDegrees(b.lon, b.lat),
             label: {
               text: BASE_GLYPH,
-              font: 'bold 14px sans-serif',
+              font: 'bold 16px sans-serif',
               fillColor: Cesium.Color.fromCssColorString(OPERATOR_COLOR[b.operator]),
-              outlineColor: Cesium.Color.BLACK,
+              outlineColor: Cesium.Color.WHITE,
               outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               showBackground: false,
+              // Grow as the user zooms in so bases stay legible against
+              // the satellite imagery; shrink slightly when zoomed way out.
+              scaleByDistance: new Cesium.NearFarScalar(
+                300_000, 1.6,
+                10_000_000, 0.9,
+              ),
               translucencyByDistance: new Cesium.NearFarScalar(
                 500_000, 1.0,
-                15_000_000, 0.25,
+                15_000_000, 0.4,
               ),
             },
           });
@@ -276,28 +282,34 @@ export default function CesiumGlobe({
         position: Cesium.Cartesian3.fromDegrees(evt.lon, evt.lat),
       };
 
+      // Distance scaler — icons grow when the user zooms in so they
+      // don't get visually swallowed by the underlying satellite imagery.
+      const eventScaler = new Cesium.NearFarScalar(300_000, 1.5, 8_000_000, 1.0);
+
       if (emoji) {
         // Emoji-rendered event (aircraft, ship, missile, cyber).
         base.label = {
           text: emoji,
-          font: isSel ? '22px sans-serif' : '17px sans-serif',
+          font: isSel ? 'bold 22px sans-serif' : 'bold 20px sans-serif',
           fillColor: color,
           outlineColor: isSel
             ? Cesium.Color.fromCssColorString('#fbbf24')
-            : Cesium.Color.BLACK,
-          outlineWidth: isSel ? 3 : 2,
+            : Cesium.Color.WHITE,
+          outlineWidth: isSel ? 4 : 3,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          scaleByDistance: eventScaler,
         };
       } else {
         // Dot-rendered event (satellite, seismic, diplomatic, economic).
         base.point = {
-          pixelSize: isSel ? 20 : 10,
+          pixelSize: isSel ? 22 : 12,
           color,
           outlineColor: isSel
             ? Cesium.Color.fromCssColorString('#fbbf24')
             : Cesium.Color.WHITE,
-          outlineWidth: isSel ? 4 : 1.5,
+          outlineWidth: isSel ? 4 : 2,
+          scaleByDistance: eventScaler,
         };
       }
 
