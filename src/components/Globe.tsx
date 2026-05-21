@@ -22,6 +22,7 @@ interface Props {
   events: IntelEvent[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  aircraftTrace?: { eventId: string; points: Array<[number, number]> } | null;
 }
 
 export default function Globe(props: Props) {

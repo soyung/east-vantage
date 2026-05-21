@@ -79,9 +79,15 @@ interface CesiumGlobeProps {
   events: IntelEvent[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  aircraftTrace?: { eventId: string; points: Array<[number, number]> } | null;
 }
 
-export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlobeProps) {
+export default function CesiumGlobe({
+  events,
+  selectedId,
+  onSelect,
+  aircraftTrace,
+}: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<InstanceType<CesiumNS['Viewer']> | null>(null);
   const CesiumRef = useRef<CesiumNS | null>(null);
@@ -319,13 +325,18 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
       viewer.entities.add(base);
 
       // Trailing polyline for moving entities (aircraft now; later ships).
-      // The track is a list of [lon, lat] pairs oldest → newest; we draw
-      // a faded line so the path is visible behind the current position.
-      if (evt.track && evt.track.length > 1) {
+      // When the user selects an ADSB event AND a full trace has been
+      // fetched for it, use the full 24h trace instead of our short
+      // in-memory accumulator. Otherwise fall back to track from events.
+      let trail = evt.track;
+      if (isSel && aircraftTrace?.eventId === evt.id && aircraftTrace.points.length > 1) {
+        trail = aircraftTrace.points;
+      }
+      if (trail && trail.length > 1) {
         const trailId = `${evt.id}-trail`;
         prevEventIdsRef.current.add(trailId);
         const flat: number[] = [];
-        for (const [lo, la] of evt.track) {
+        for (const [lo, la] of trail) {
           flat.push(lo, la);
         }
         viewer.entities.add({
@@ -339,7 +350,7 @@ export default function CesiumGlobe({ events, selectedId, onSelect }: CesiumGlob
         });
       }
     }
-  }, [events, selectedId, ready]);
+  }, [events, selectedId, ready, aircraftTrace]);
 
   // Fly camera to the selected event so a click on a tiny dot reveals
   // where you actually are.

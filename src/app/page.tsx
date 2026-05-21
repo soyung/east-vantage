@@ -39,6 +39,13 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState<EventCategory | 'all'>('all');
   // Mobile-only: globe height as % of viewport. Drag the handle to resize.
   const [mobileMainPct, setMobileMainPct] = useState(45);
+  // Full historical trace of the selected aircraft (lon,lat pairs from
+  // ADSBexchange via /api/aircraft-trace/[hex]). When set, the globe
+  // replaces the short in-memory trail for that event with this trace.
+  const [aircraftTrace, setAircraftTrace] = useState<{
+    eventId: string;
+    points: Array<[number, number]>;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +79,34 @@ export default function Home() {
       clearInterval(id);
     };
   }, []);
+
+  // When an ADSB event is selected, fetch its full 24h trace from
+  // ADSBexchange (via our proxy). Cleared when selection changes away
+  // from that aircraft.
+  useEffect(() => {
+    if (!selectedId || !selectedId.startsWith('adsb-')) {
+      setAircraftTrace(null);
+      return;
+    }
+    const hex = selectedId.replace(/^adsb-/, '');
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/aircraft-trace/${hex}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (cancelled || !data.points) return;
+        setAircraftTrace({
+          eventId: selectedId,
+          points: data.points.map((p: { lon: number; lat: number }) => [p.lon, p.lat]),
+        });
+      } catch (err) {
+        console.warn('[page] aircraft trace fetch failed:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   // After region filter only — used for chip counts so the user sees how
   // many events each category has within their current region selection.
@@ -140,7 +175,12 @@ export default function Home() {
           className="relative h-[var(--main-h)] flex-shrink-0 md:h-auto md:flex-1"
           style={{ '--main-h': `${mobileMainPct}dvh` } as React.CSSProperties}
         >
-          <Globe events={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+          <Globe
+            events={filtered}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            aircraftTrace={aircraftTrace}
+          />
         </main>
       </div>
     </div>
