@@ -26,15 +26,20 @@ const SUBREDDITS = [
 
 const REGION_RX =
   /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|tsmc|hsinchu|taipei|kaohsiung|north korea|dprk|kim jong|pyongyang|yongbyon|korean peninsula|south korea|seoul|busan|jeju|ieodo|japan|japanese|jsdf|yokota|kadena|misawa|iwakuni|sasebo|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|guangzhou|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|自衛隊)/i;
+// Strong-only kinetic anchors (same posture as wires.ts — without an
+// LLM gate we can't afford soft keywords).
 const KINETIC_RX =
-  /(missile|launch|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|hack|sanction|invasion|deploy|test|nuclear|reactor|provocation|airspace|naval)/i;
+  /(missile|icbm|srbm|ballistic|hwasong|adiz|plaaf|plan navy|warship|aircraft carrier|frigate|destroyer|submarine|nuclear test|airspace (?:violation|incursion)|median line|cyber(?:attack|intrusion|attribution)|j-?\d{1,2}\b|f-?\d{1,2}\b|戰機|战机|軍機|军机|미사일|핵실험)/i;
+
+const NEGATIVE_RX =
+  /(working group|diplomat|envoy|summit|talks|cooperation|partnership|trade deal|economic\b|cultural|business owner|visa|immigration|migrant|refugee|tourism|tourist|celebrity|stock|earnings|finance|entertainment|drama|k-pop|sport|olympic|movie|film|festival)/i;
 
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
-  [/missile|launch|projectile|icbm|srbm|cruise|hwasong|ballistic/i, 'missile'],
-  [/aircraft|fighter|adiz|j-?\d+|jet|airspace|sortie|incursion|scramble/i, 'air'],
-  [/navy|naval|carrier|warship|frigate|destroyer|submarine|vessel|ship|fleet|coast guard/i, 'naval'],
-  [/cyber|hack|apt|malware|breach|phishing|intrusion/i, 'cyber'],
-  [/satellite|imagery|firms|thermal|reactor|enrichment/i, 'satellite'],
+  [/missile|projectile|icbm|srbm|cruise missile|hwasong|ballistic|launch(?:\s+(?:vehicle|pad|test|complex|of))/i, 'missile'],
+  [/pla\s+aircraft|adiz (?:incursion|violation)|airspace (?:violation|incursion)|fighter scramble|crossed median|median line|j-?\d{1,2}\b|f-?\d{1,2}\b|戰機|战机|軍機|军机/i, 'air'],
+  [/pla(n|\s+navy)|naval (?:vessel|exercise|drill)|warship|aircraft carrier|frigate|destroyer|submarine|coast guard (?:vessel|incursion)/i, 'naval'],
+  [/(?:cyber|hack|apt|malware)(?:\s+(?:attack|intrusion|attribution|breach|campaign))/i, 'cyber'],
+  [/satellite (?:imagery|image)|thermal anomaly|reactor (?:activity|test)|enrichment/i, 'satellite'],
 ];
 
 function classifyCategory(text: string): EventCategory | null {
@@ -111,6 +116,7 @@ async function fetchSubreddit(sub: string): Promise<FetchResult> {
 
   const events: IntelEvent[] = [];
   for (const e of entries) {
+    if (NEGATIVE_RX.test(e.title)) continue;
     if (!REGION_RX.test(e.title)) continue;
     if (!KINETIC_RX.test(e.title)) continue;
     const category = classifyCategory(e.title);

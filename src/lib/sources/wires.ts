@@ -30,32 +30,44 @@ const FEEDS: FeedSpec[] = [
 const REGION_RX =
   /(taiwan|china|chinese|pla\b|plaaf|plan\b|adiz|taipei|kaohsiung|tsmc|hsinchu|north korea|dprk|kim jong|pyongyang|yongbyon|sohae|punggye|korean peninsula|south korea|seoul|jeju|ieodo|japan|japanese|jsdf|jasdf|jmsdf|yokota|kadena|misawa|iwakuni|sasebo|yokosuka|okinawa|senkaku|diaoyu|hong kong|beijing|shanghai|guangzhou|xinjiang|tibet|台|中|韓|朝|日|防空|海峡|미사일|북한|대만|중국|훈련|発射|戦闘機|領空|自衛隊)/i;
 
+// Without an LLM gate (user opted out of Anthropic), the regex has to
+// be conservative — soft words like bare 'scramble' / 'crossed' / 'fire'
+// produce too many false positives ("scramble to leave", "crossed off",
+// "fire someone"). Strong-only kinetic anchors:
 const KINETIC_RX =
-  /(missile|sortie|incursion|drill|exercise|crossed|breach|warship|carrier|fighter|jet|adiz|scramble|cyber|sanction|nuclear test|reactor|provocation|airspace|naval|warning|patrol|飛彈|导弹|发射|戰機|战机|軍機|军机|演習|演习|미사일|훈련|침범|ミサイル|戦闘機|演習)/i;
+  /(missile|icbm|srbm|ballistic|hwasong|projectile|adiz|plaaf|plan navy|warship|aircraft carrier|frigate|destroyer|submarine|nuclear test|airspace violation|airspace incursion|coast guard incursion|median line|cyber(attack|intrusion|attribution)|飛彈|导弹|戰機|战机|軍機|军机|軍演|军演|空軍|空军|미사일|핵실험|침범|ミサイル|戦闘機|自衛隊|発射(?:実験|演習))/i;
 
-// Diplomatic/business contexts that produce false positives even when
-// they contain words like 'launch' or 'test'. Drop if title matches.
+// Topics that produce false positives even when a kinetic word slips in.
+// Expanded to drop business / visa / entertainment / sport / lifestyle.
 const NEGATIVE_RX =
-  /(working group|diplomat|envoy|summit|talks|meeting|cooperation|partnership|trade deal|economic|cultural|initiative|launches? (?:working|group|partnership|initiative|talks|meeting|investigation))/i;
+  /(working group|diplomat|envoy|summit|talks|meeting|cooperation|partnership|trade deal|economic\b|cultural|initiative|launches? (?:working|group|partnership|initiative|talks|meeting|investigation)|business owner|visa|immigration|migrant|refugee|tourism|tourist|celebrity|stock|earnings|finance|entertainment|drama|k-pop|j-pop|sport|olympic|movie|film|festival)/i;
 
 const CATEGORY_RULES: Array<[RegExp, EventCategory]> = [
-  // Note: bare 'launch' removed — too many diplomatic false positives
-  // ("launch working groups", "launch initiative"). Real launches use
-  // 'missile launch', 'icbm', 'srbm', etc.
   [
-    /missile|projectile|icbm|srbm|cruise missile|hwasong|ballistic|飛彈|导弹|미사일|발사|ミサイル|発射|launch(?:\s+(?:vehicle|pad|test|complex|of (?:a |the )?(?:missile|icbm|srbm|rocket|satellite)))/i,
+    /missile|projectile|icbm|srbm|cruise missile|hwasong|ballistic|飛彈|导弹|미사일|ミサイル|launch(?:\s+(?:vehicle|pad|test|complex|of (?:a |the )?(?:missile|icbm|srbm|rocket|satellite)))/i,
     'missile',
   ],
+  // Air: require explicit military-aircraft / airspace-violation context.
+  // 'scramble' alone is too soft — "scramble to leave Japan" got classified
+  // as air category. Now requires modifier.
   [
-    /aircraft|fighter|adiz|j-?\d+|jet|airspace|sortie|incursion|scramble|crossed median|戰機|战机|軍機|军机|空軍|空军|防空|항공기|영공|戦闘機|領空/i,
+    /pla\s+aircraft|chinese (?:aircraft|jets?|fighters?)|adiz (?:incursion|violation)|airspace (?:violation|incursion)|fighter scramble|scrambl\w+ (?:fighters?|jets?|aircraft|interception)|crossed median|median line|j-?\d{1,2}\b|f-?\d{1,2}\b|戰機|战机|軍機|军机|空軍|空军|防空識別|防空识别|戦闘機|領空侵犯/i,
     'air',
   ],
+  // Naval: require military naval words — bare 'ship' / 'vessel' / 'fleet'
+  // would catch cargo / fishing vessels.
   [
-    /navy|naval|carrier|warship|frigate|destroyer|submarine|vessel|ship|fleet|coast guard|艦|舰|海軍|海军|海警|함정|艦艇/i,
+    /pla(n|\s+navy)|naval (?:vessel|fleet|exercise|drill|incursion)|warship|aircraft carrier|frigate|destroyer|submarine|coast guard (?:vessel|incursion|intrusion)|海警船|海軍艦|军舰|軍艦|구축함|함정 (?:이동|배치)/i,
     'naval',
   ],
-  [/cyber|hack|apt|malware|breach|phishing/i, 'cyber'],
-  [/satellite|imagery|thermal|reactor|enrichment/i, 'satellite'],
+  [
+    /(?:cyber|hack|apt|malware)(?:\s+(?:attack|intrusion|attribution|breach|campaign))|phishing campaign/i,
+    'cyber',
+  ],
+  [
+    /satellite (?:imagery|image)|thermal anomaly|reactor (?:activity|test|operation)|enrichment|衛星画像/i,
+    'satellite',
+  ],
 ];
 
 function classifyCategory(text: string): EventCategory | null {
