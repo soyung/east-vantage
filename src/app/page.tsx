@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Header from '@/components/Header';
 import Globe from '@/components/Globe';
+import EntityGraph from '@/components/EntityGraph';
 import EventFeed from '@/components/EventFeed';
 import FilterChips from '@/components/FilterChips';
 import MarketPanel from '@/components/MarketPanel';
@@ -36,6 +37,16 @@ export default function Home() {
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Main-pane view: live OSINT map vs. the leadership relationship graph.
+  // Deep-linkable via ?view=network so a specific pane can be shared.
+  const [mainView, setMainView] = useState<'map' | 'network'>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('view') === 'network'
+        ? 'network'
+        : 'map';
+    }
+    return 'map';
+  });
   const [activeRegion, setActiveRegion] = useState<EventRegion | 'all'>('all');
   const [activeCategory, setActiveCategory] = useState<EventCategory | 'all'>('all');
   // Mobile-only: globe height as % of viewport. Drag the handle to resize.
@@ -187,15 +198,33 @@ export default function Home() {
           className="relative flex h-[var(--main-h)] flex-shrink-0 flex-col md:h-auto md:flex-1"
           style={{ '--main-h': `${mobileMainPct}dvh` } as React.CSSProperties}
         >
-          <div className="relative min-h-0 flex-1">
-            <Globe
-              events={filtered}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              aircraftTrace={aircraftTrace}
-            />
+          {/* View toggle: live map ⇄ leadership network */}
+          <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 overflow-hidden rounded border border-zinc-800 bg-[#0a0e16]/90 text-[11px] backdrop-blur">
+            {(['map', 'network'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setMainView(v)}
+                className={`px-3 py-1 transition ${
+                  mainView === v ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800/60'
+                }`}
+              >
+                {v === 'map' ? 'Live map' : 'Leadership'}
+              </button>
+            ))}
           </div>
-          <TimelineScrubber onRangeChange={setTimeRange} />
+          <div className="relative min-h-0 flex-1">
+            {mainView === 'map' ? (
+              <Globe
+                events={filtered}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                aircraftTrace={aircraftTrace}
+              />
+            ) : (
+              <EntityGraph />
+            )}
+          </div>
+          {mainView === 'map' && <TimelineScrubber onRangeChange={setTimeRange} />}
         </main>
       </div>
     </div>
